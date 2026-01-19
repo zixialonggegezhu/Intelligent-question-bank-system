@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>试题库管理 | 国家数字大学智慧学习平台</title>
+    
+    <!-- 1. 字体 Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- 2. Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc',
+                            400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca',
+                            800: '#3730a3', 900: '#312e81',
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.2s ease-out',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                    },
+                    keyframes: {
+                        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+                        slideUp: { '0%': { transform: 'translateY(10px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- 3. Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- 4. Vue 3 (国内稳定源) -->
+    <script src="https://cdn.staticfile.org/vue/3.3.4/vue.global.prod.min.js"></script>
+
+    <style>
+        body { background-color: #f8fafc; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .nav-active { background-color: #eef2ff; color: #4f46e5; border-right: 3px solid #4f46e5; }
+        
+        /* 详情弹窗过渡动画 */
+        .modal-enter-active, .modal-leave-active { transition: opacity 0.3s ease; }
+        .modal-enter-from, .modal-leave-to { opacity: 0; }
+        .modal-enter-active .modal-content, .modal-leave-active .modal-content { transition: transform 0.3s ease; }
+        .modal-enter-from .modal-content, .modal-leave-to .modal-content { transform: scale(0.95) translateY(10px); }
+
+        /* v-cloak 防闪烁 */
+        [v-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="text-slate-600 antialiased h-screen flex overflow-hidden">
+
+    <div id="app" class="flex w-full h-full relative" v-cloak>
+
+        <!-- 左侧导航栏 -->
+        <aside class="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 z-20 shadow-sm transition-all">
+            <div class="h-16 flex items-center px-5 border-b border-slate-50">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-600 to-brand-500 flex items-center justify-center text-white mr-3 shadow-md shadow-brand-200">
+                    <i class="ph-bold ph-graduation-cap text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-slate-800 text-sm tracking-tight">国家数字大学</h1>
+                    <p class="text-[10px] text-slate-400 font-medium">智慧学习平台 v2.1</p>
+                </div>
+            </div>
+            <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+                <div class="px-5 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">教学管理</div>
+                <a href="#" class="flex items-center px-5 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors border-r-4 border-transparent">
+                    <i class="ph ph-squares-four text-lg mr-3"></i> 课程概览
+                </a>
+                <a href="#" class="nav-active flex items-center px-5 py-3 text-sm font-medium transition-colors">
+                    <i class="ph-fill ph-files text-lg mr-3"></i> 试题库管理
+                </a>
+                <a href="#" class="flex items-center px-5 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors border-r-4 border-transparent">
+                    <i class="ph ph-tree-structure text-lg mr-3"></i> 知识图谱
+                </a>
+                <div class="px-5 pb-2 pt-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">资源中心</div>
+                <a href="#" class="flex items-center px-5 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors border-r-4 border-transparent">
+                    <i class="ph ph-book-open text-lg mr-3"></i> 教材管理
+                </a>
+            </nav>
+            <div class="p-4 bg-slate-50 border-t border-slate-200">
+                <div class="flex items-center">
+                    <div class="w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center text-brand-600 font-bold text-xs shadow-sm">DS</div>
+                    <div class="ml-3 overflow-hidden">
+                        <p class="text-xs font-bold text-slate-700 truncate">数据结构与算法</p>
+                        <p class="text-[10px] text-slate-500 truncate">2025秋季学期</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="flex-1 flex flex-col h-full bg-[#f8fafc] relative min-w-0">
+            <!-- 顶部 Header -->
+            <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-10">
+                <nav class="flex items-center text-sm text-slate-500">
+                    <span class="hover:text-brand-600 cursor-pointer">资源库</span>
+                    <i class="ph ph-caret-right mx-2 text-xs text-slate-300"></i>
+                    <span class="font-semibold text-slate-800">试题库</span>
+                </nav>
+                <div class="flex items-center gap-4">
+                    <div class="relative group">
+                        <!-- 优化：跳转至工作台 -->
+                        <button @click="triggerAiWorkbench" class="flex items-center gap-2 bg-gradient-to-r from-brand-600 to-indigo-500 hover:from-brand-700 hover:to-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg shadow-brand-500/20 transition-all duration-300 transform group-hover:-translate-y-0.5 active:scale-95">
+                            <i class="ph-fill ph-sparkle text-yellow-300"></i> AI 智能出题
+                        </button>
+                        <div class="absolute right-0 top-full mt-2 w-64 bg-slate-800 text-white text-xs p-3 rounded-lg shadow-xl opacity-0 invisible group-hover:visible transition-all z-50 transform translate-y-2 group-hover:translate-y-0">
+                            AI 助教：基于当前知识点，一键生成相似题、衍生题。
+                        </div>
+                    </div>
+                    <div class="h-5 w-px bg-slate-200"></div>
+                    <button class="relative p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-full transition-colors">
+                        <i class="ph ph-bell text-xl"></i>
+                    </button>
+                    <img src="https://i.pravatar.cc/150?img=32" alt="User" class="w-8 h-8 rounded-full ring-2 ring-white shadow-sm cursor-pointer hover:ring-brand-200 transition-all">
+                </div>
+            </header>
+
+            <!-- 筛选与操作栏 (Sticky) -->
+            <div class="px-6 py-4 z-30 sticky top-0 bg-[#f8fafc]/95 backdrop-blur-sm transition-all duration-300">
+                
+                <!-- 模式A：常规筛选栏 -->
+                <div v-if="selectedIds.length === 0" class="flex flex-col gap-4 animate-fade-in">
+                    <!-- 第一行：核心筛选 -->
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex items-center gap-3 bg-white p-1 rounded-lg border border-slate-200 shadow-sm relative z-20">
+                            <!-- 章节筛选 -->
+                            <div class="relative group border-r border-slate-100">
+                                <div class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><i class="ph ph-folder-notch"></i></div>
+                                <select v-model="filters.chapter" class="appearance-none pl-9 pr-8 py-2 bg-transparent text-sm font-medium text-slate-700 focus:outline-none cursor-pointer hover:text-brand-600 w-44 truncate">
+                                    <option value="">全书所有章节</option>
+                                    <option v-for="ch in chapters" :key="ch.id" :value="ch.id">{{ ch.name }}</option>
+                                </select>
+                                <i class="ph-bold ph-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs"></i>
+                            </div>
+                            <!-- 知识点下拉 (多选 Combobox) -->
+                            <div class="relative w-64" ref="kpDropdownRef">
+                                <div class="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500 pointer-events-none"><i class="ph-fill ph-brain"></i></div>
+                                <input type="text" v-model="kpSearchQuery" @focus="isKpDropdownOpen = true" 
+                                       :placeholder="kpPlaceholder" 
+                                       class="w-full pl-9 pr-8 py-2 bg-transparent text-sm font-medium text-slate-700 focus:outline-none placeholder:text-slate-400 transition-all">
+                                
+                                <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
+                                    <button v-if="filters.kp.length > 0" @click="filters.kp = []" class="p-1 text-slate-400 hover:text-red-500 transition-colors mr-0.5" title="清除所有已选知识点">
+                                        <i class="ph-bold ph-x text-xs"></i>
+                                    </button>
+                                    <i class="ph-bold ph-caret-down text-slate-400 pointer-events-none text-xs"></i>
+                                </div>
+
+                                <div v-if="isKpDropdownOpen" class="absolute top-full left-0 w-full mt-2 bg-white rounded-lg shadow-xl border border-slate-100 max-h-60 overflow-y-auto py-1 z-50">
+                                    <div v-for="kp in filteredKpList" :key="kp.id" @click="toggleKp(kp)" 
+                                         class="px-4 py-2 text-sm cursor-pointer flex items-center justify-between group transition-colors"
+                                         :class="filters.kp.includes(kp.id) ? 'bg-brand-50/50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
+                                        <span class="truncate pr-2">{{ kp.name }}</span>
+                                        <i :class="filters.kp.includes(kp.id) ? 'ph-fill ph-check-square text-brand-600 text-lg' : 'ph-bold ph-square text-slate-300 group-hover:text-brand-400 text-lg'"></i>
+                                    </div>
+                                    <div v-if="filteredKpList.length === 0" class="px-4 py-2 text-xs text-slate-400 text-center">无匹配知识点</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 搜索框 -->
+                        <div class="relative group">
+                            <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors"></i>
+                            <input v-model="filters.search" type="text" placeholder="搜索题干、标签..." class="pl-10 pr-4 py-2.5 w-64 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all shadow-sm">
+                        </div>
+                    </div>
+
+                    <!-- 第二行：标签与操作 -->
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="flex bg-white rounded-lg border border-slate-200 p-1 shadow-sm">
+                                <button v-for="t in typeOptions" :key="t.value" @click="filters.type = t.value" :class="filters.type === t.value ? 'bg-brand-50 text-brand-600 font-medium' : 'text-slate-500 hover:text-slate-700'" class="px-3 py-1 text-xs rounded-md transition-all flex gap-1 items-center">
+                                    {{ t.label }} <span class="text-[10px] opacity-60 bg-black/5 px-1 rounded-full">{{ getCount('type', t.value) }}</span>
+                                </button>
+                            </div>
+                            <div class="flex bg-white rounded-lg border border-slate-200 p-1 shadow-sm">
+                                <button v-for="l in levelOptions" :key="l.value" @click="filters.level = l.value" :class="filters.level === l.value ? 'bg-slate-100 text-slate-800 font-medium' : 'text-slate-500 hover:text-slate-700'" class="px-3 py-1 text-xs rounded-md transition-all flex gap-1 items-center">
+                                    {{ l.label }} <span class="text-[10px] opacity-60 bg-black/5 px-1 rounded-full">{{ getCount('level', l.value) }}</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            
+                            <!-- 排序下拉 -->
+                            <div class="relative group z-20">
+                                <div class="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-600 text-xs px-3 py-1.5 rounded-lg shadow-sm cursor-pointer hover:border-brand-300 hover:text-brand-600 transition-all">
+                                    <i class="ph-bold ph-sort-ascending"></i>
+                                    <select v-model="currentSort" class="appearance-none bg-transparent cursor-pointer focus:outline-none pr-3 font-medium">
+                                        <option value="newest">最新创建</option>
+                                        <option value="oldest">最早创建</option>
+                                        <option value="level-asc">难度 (易→难)</option>
+                                        <option value="level-desc">难度 (难→易)</option>
+                                    </select>
+                                    <i class="ph-bold ph-caret-down absolute right-2 pointer-events-none text-xs"></i>
+                                </div>
+                            </div>
+
+                            <div class="h-4 w-px bg-slate-300 mx-1"></div>
+
+                            <span class="text-xs text-slate-400 font-medium">共 <strong class="text-slate-700 text-sm">{{ filteredQuestions.length }}</strong> 题</span>
+                            <div class="bg-white rounded-lg border border-slate-200 p-0.5 shadow-sm flex">
+                                <button @click="viewMode = 'grid'" :class="viewMode === 'grid' ? 'bg-slate-100 text-brand-600' : 'text-slate-400'" class="p-1.5 rounded"><i class="ph-fill ph-grid-four"></i></button>
+                                <button @click="viewMode = 'list'" :class="viewMode === 'list' ? 'bg-slate-100 text-brand-600' : 'text-slate-400'" class="p-1.5 rounded"><i class="ph-fill ph-list-dashes"></i></button>
+                            </div>
+                            <button @click="showToast('打开手动录入抽屉')" class="bg-white border border-slate-200 hover:border-brand-300 text-slate-700 text-xs px-3 py-1.5 rounded-lg shadow-sm transition-all flex items-center gap-2 hover:text-brand-600">
+                                <i class="ph-bold ph-plus"></i> 手动录入
+                            </button>
+                            <button @click="showToast('打开导入模态框')" class="bg-white border border-slate-200 hover:border-brand-300 text-slate-700 text-xs px-3 py-1.5 rounded-lg shadow-sm transition-all flex items-center gap-2 hover:text-brand-600">
+                                <i class="ph-bold ph-upload-simple"></i> 导入
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 模式B：批量操作栏 -->
+                <div v-else class="flex items-center justify-between bg-brand-50 border border-brand-200 rounded-xl p-4 shadow-sm animate-fade-in">
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <div class="w-5 h-5 rounded bg-brand-600 flex items-center justify-center text-white"><i class="ph-bold ph-check text-xs"></i></div>
+                            <span class="text-sm font-medium text-brand-900">已选择 <span class="font-bold text-brand-600 text-lg mx-1">{{ selectedIds.length }}</span> 项</span>
+                        </div>
+                        <button @click="selectedIds = []" class="text-xs text-brand-500 hover:text-brand-700 hover:underline">取消选择</button>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button @click="generateQuiz" class="bg-white border border-brand-200 text-brand-700 hover:bg-brand-100 px-4 py-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-2">
+                            <i class="ph-bold ph-pencil-circle text-lg"></i> 生成测验活动
+                        </button>
+                        <div class="h-4 w-px bg-brand-200 mx-1"></div>
+                        <button @click="handleBulkExport" class="bg-white border border-brand-200 text-brand-700 hover:bg-brand-100 px-4 py-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-2"><i class="ph-bold ph-download-simple"></i> 批量导出</button>
+                        <button @click="openDeleteModal" class="bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 px-4 py-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-2"><i class="ph-bold ph-trash"></i> 批量删除</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 列表内容区 -->
+            <div class="flex-1 overflow-y-auto px-6 pb-10">
+                <!-- Grid View -->
+                <div v-if="viewMode === 'grid'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-8">
+                    <div v-for="q in filteredQuestions" :key="q.id" 
+                         class="group bg-white rounded-xl border border-slate-200 p-5 hover:border-brand-300 hover:shadow-lg transition-all relative flex flex-col"
+                         :class="{'ring-2 ring-brand-500 border-transparent': selectedIds.includes(q.id)}">
+                        
+                        <!-- 复选框 Overlay -->
+                        <div @click.stop="toggleSelect(q.id)" class="absolute top-4 right-4 z-10 cursor-pointer p-1 rounded-md transition-all" :class="selectedIds.includes(q.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
+                            <div class="w-5 h-5 rounded border flex items-center justify-center transition-colors" :class="selectedIds.includes(q.id) ? 'bg-brand-600 border-brand-600' : 'bg-white border-slate-300 hover:border-brand-500'">
+                                <i v-if="selectedIds.includes(q.id)" class="ph-bold ph-check text-white text-xs"></i>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 mb-3">
+                            <span :class="getTypeBadgeClass(q.type)" class="px-2 py-0.5 rounded text-[10px] font-bold border">{{ getTypeName(q.type) }}</span>
+                            <span class="text-xs text-slate-400 font-medium flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full" :class="getLevelDotColor(q.level)"></span>{{ getLevelName(q.level) }}
+                            </span>
+                        </div>
+                        <div class="mb-2 min-h-[48px] cursor-pointer" @click="openDetail(q)">
+                            <h3 class="text-slate-700 text-sm font-medium leading-relaxed line-clamp-2 group-hover:text-brand-600" v-html="q.content"></h3>
+                        </div>
+
+                        <!-- 卡片内增加创建信息 -->
+                        <div class="flex items-center gap-2 text-[10px] text-slate-400 mb-4 bg-slate-50 px-2 py-1 rounded w-fit">
+                            <i class="ph-bold ph-user-circle"></i> {{ q.creator }}
+                            <span class="text-slate-300">|</span>
+                            <i class="ph-bold ph-calendar-blank"></i> {{ q.createdTime }}
+                        </div>
+
+                        <div class="mt-auto pt-3 border-t border-slate-50 flex flex-col gap-2">
+                            <div @click.stop="applyKpFilter(q)" class="flex items-center gap-1.5 text-xs text-brand-700 bg-brand-50 px-2 py-1.5 rounded-md w-fit border border-brand-100/50 cursor-pointer hover:bg-brand-100 transition-colors" title="点击只筛选此知识点">
+                                <i class="ph-fill ph-brain text-brand-500"></i>{{ q.kpName }}
+                            </div>
+                            <div class="flex items-center justify-between h-7 relative">
+                                <div class="flex items-center gap-2 text-[10px] text-slate-400 transition-opacity duration-200 group-hover:opacity-0">
+                                    <span class="bg-slate-100 px-2 py-0.5 rounded-full">{{ q.cognitive }}</span>
+                                    <span>{{ q.source }}</span>
+                                </div>
+                                <!-- 操作组 -->
+                                <div class="absolute right-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0 bg-white pl-2">
+                                    <button @click.stop="openDetail(q)" class="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded" title="查看详情"><i class="ph-bold ph-eye"></i></button>
+                                    <button @click.stop="showToast('跳转编辑')" class="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded" title="编辑"><i class="ph-bold ph-pencil-simple"></i></button>
+                                    <button @click.stop="showToast('正在生成相似题')" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="AI生成相似题"><i class="ph-bold ph-sparkle"></i></button>
+                                    <button @click.stop="confirmDeleteSingle(q)" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded" title="删除"><i class="ph-bold ph-trash"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- List View -->
+                <div v-else class="flex flex-col gap-3 pb-8">
+                    <!-- List Header -->
+                    <div class="flex items-center px-5 py-2 text-xs font-semibold text-slate-400 bg-slate-50/50 rounded-lg">
+                        <div class="w-10 text-center">
+                            <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
+                        </div>
+                        <div class="w-16">题型</div>
+                        <div class="flex-1">题目内容 / 知识点</div>
+                        <!-- 创建信息列 -->
+                        <div class="w-28 text-right pr-4">创建信息</div>
+                        <div class="w-20 text-center">难度</div>
+                        <div class="w-28 text-right pr-2">操作</div>
+                    </div>
+
+                    <div v-for="q in filteredQuestions" :key="q.id" 
+                         class="bg-white rounded-lg border border-slate-200 px-5 py-3 flex items-center gap-4 hover:shadow-md transition-all group"
+                         :class="{'bg-brand-50/30 border-brand-200': selectedIds.includes(q.id)}">
+                        <!-- Row Checkbox -->
+                        <div class="w-10 text-center flex-shrink-0" @click.stop>
+                            <input type="checkbox" :checked="selectedIds.includes(q.id)" @change="toggleSelect(q.id)" class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
+                        </div>
+                        <div class="w-16 flex-shrink-0">
+                            <span :class="getTypeBadgeClass(q.type)" class="px-2 py-0.5 rounded text-[10px] font-bold border block text-center">{{ getTypeName(q.type) }}</span>
+                        </div>
+                        <div class="flex-1 min-w-0 flex flex-col gap-1 cursor-pointer" @click="openDetail(q)">
+                            <p class="text-sm text-slate-700 truncate font-medium group-hover:text-brand-600" v-html="q.content"></p>
+                            <div class="flex items-center gap-2 text-xs">
+                                <span @click.stop="applyKpFilter(q)" class="text-brand-600 bg-brand-50 px-1.5 rounded cursor-pointer hover:bg-brand-100 hover:underline" title="点击只筛选此知识点">
+                                    <i class="ph-fill ph-brain text-[10px]"></i> {{ q.kpName }}
+                                </span>
+                                <span class="text-slate-400">•</span>
+                                <span class="text-slate-500 bg-slate-100 px-1.5 rounded">{{ q.chapterName }}</span>
+                            </div>
+                        </div>
+                        <!-- 创建信息列内容 -->
+                        <div class="w-28 flex flex-col items-end justify-center text-xs">
+                            <span class="text-slate-700 font-medium">{{ q.createdTime }}</span>
+                            <span class="text-slate-400 scale-90 origin-right">{{ q.creator }}</span>
+                        </div>
+                        <div class="w-20 text-center text-xs text-slate-500">{{ getLevelName(q.level) }}</div>
+                        <div class="w-28 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button @click.stop="openDetail(q)" class="text-slate-400 hover:text-brand-600 p-1 rounded hover:bg-slate-100" title="详情"><i class="ph-bold ph-eye text-lg"></i></button>
+                            <button @click.stop="showToast('正在生成相似题')" class="text-slate-400 hover:text-indigo-600 p-1 rounded hover:bg-indigo-50" title="AI相似题"><i class="ph-bold ph-sparkle text-lg"></i></button>
+                            <button @click.stop="confirmDeleteSingle(q)" class="text-slate-400 hover:text-red-500 p-1 rounded hover:bg-red-50" title="删除"><i class="ph-bold ph-trash text-lg"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div v-if="filteredQuestions.length === 0" class="flex flex-col items-center justify-center h-80 text-center">
+                    <div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-6 text-slate-300">
+                        <i class="ph-fill ph-magnifying-glass text-4xl"></i>
+                    </div>
+                    <h3 class="text-slate-800 font-bold text-lg mb-2">未找到相关试题</h3>
+                    <p class="text-slate-500 text-sm mb-6 max-w-xs mx-auto leading-relaxed">请尝试调整搜索条件，或使用 AI 助教快速生成新题目。</p>
+                    <button @click="triggerAiWorkbench" class="bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-full font-medium shadow-md shadow-brand-500/20 transition-all transform hover:-translate-y-0.5 flex items-center gap-2">
+                        <i class="ph-bold ph-sparkle"></i> 去 AI 工作台生成
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Modals & Toasts -->
+        
+        <!-- 1. Detail Modal -->
+        <transition name="modal">
+            <div v-if="detailModal.show" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm" @click.self="detailModal.show = false">
+                <div class="modal-content bg-white rounded-xl shadow-2xl w-[800px] max-h-[90vh] flex flex-col overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                        <div class="flex items-center gap-3">
+                            <span :class="getTypeBadgeClass(detailModal.data.type)" class="px-2 py-0.5 rounded text-xs font-bold border">{{ getTypeName(detailModal.data.type) }}</span>
+                            <span class="text-sm text-slate-500 font-mono">ID: {{ detailModal.data.id }}</span>
+                            <span v-if="detailModal.data.source === 'AI生成'" class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full flex items-center gap-1"><i class="ph-fill ph-sparkle"></i> AI生成</span>
+                        </div>
+                        <button @click="detailModal.show = false" class="text-slate-400 hover:text-slate-600"><i class="ph-bold ph-x text-lg"></i></button>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-8">
+                        <div class="mb-6">
+                            <h3 class="text-lg font-medium text-slate-800 leading-relaxed select-text" v-html="detailModal.data.content"></h3>
+                        </div>
+                        <!-- Options (Single/Multi/Judge) -->
+                        <div v-if="['single', 'multi', 'judge'].includes(detailModal.data.type)" class="space-y-3 mb-8">
+                            <div v-for="opt in detailModal.data.options" :key="opt.label" class="flex items-start gap-3 p-3 rounded-lg border" :class="detailModal.data.answer.includes(opt.label) ? 'bg-green-50 border-green-200' : 'bg-white border-slate-200'">
+                                <span class="font-bold w-6 h-6 flex items-center justify-center rounded-full text-xs" :class="detailModal.data.answer.includes(opt.label) ? 'bg-green-600 text-white' : 'bg-slate-100 text-slate-500'">{{ opt.label }}</span>
+                                <span class="text-sm text-slate-700" :class="{'font-medium text-green-800': detailModal.data.answer.includes(opt.label)}">{{ opt.content }}</span>
+                                <i v-if="detailModal.data.answer.includes(opt.label)" class="ph-bold ph-check text-green-600 ml-auto"></i>
+                            </div>
+                        </div>
+                        <!-- Essay / Fill -->
+                        <div v-if="['essay', 'fill'].includes(detailModal.data.type)" class="mb-8">
+                            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-4">
+                                <span class="text-xs font-bold text-slate-500 uppercase block mb-2">参考答案</span>
+                                <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{{ detailModal.data.answer }}</p>
+                                <div v-if="detailModal.data.type === 'fill' && detailModal.data.orderLimit" class="mt-3 pt-3 border-t border-slate-200 flex items-center gap-2">
+                                    <span class="text-xs font-bold text-slate-400">限制答案顺序:</span>
+                                    <span class="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
+                                        {{ getOrderLimitLabel(detailModal.data.orderLimit) }}
+                                    </span>
+                                </div>
+                            </div>
+                            <!-- 仅简答题显示评分标准 -->
+                            <div v-if="detailModal.data.type === 'essay' && detailModal.data.gradingCriteria" class="bg-amber-50 p-4 rounded-lg border border-amber-100">
+                                <span class="text-xs font-bold text-amber-600 uppercase block mb-2">评分标准</span>
+                                <ul class="list-disc list-inside text-sm text-amber-800 space-y-1">
+                                    <li v-for="(rule, idx) in detailModal.data.gradingCriteria" :key="idx">{{ rule }}</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <!-- Analysis -->
+                        <div class="border-t border-slate-100 pt-6">
+                            <div class="flex items-center gap-2 mb-2"><i class="ph-fill ph-lightbulb text-yellow-500"></i><span class="font-bold text-slate-700 text-sm">试题解析</span></div>
+                            <p class="text-sm text-slate-600 leading-relaxed">{{ detailModal.data.analysis }}</p>
+                        </div>
+                    </div>
+                    <!-- 修复：详情页底部信息，增加“所属章节” -->
+                    <div class="bg-slate-50 px-8 py-4 border-t border-slate-200 grid grid-cols-4 gap-4 text-xs">
+                        <div><span class="text-slate-400 block mb-1">关联知识点</span><span class="font-medium text-brand-600">{{ detailModal.data.kpName }}</span></div>
+                        <div><span class="text-slate-400 block mb-1">所属章节</span><span class="font-medium text-slate-700">{{ detailModal.data.chapterName }}</span></div>
+                        <div><span class="text-slate-400 block mb-1">创建信息</span><span class="font-medium text-slate-700">{{ detailModal.data.creator }} / {{ detailModal.data.createdTime }}</span></div>
+                        <div><span class="text-slate-400 block mb-1">考核层级</span><span class="font-medium text-slate-700">{{ detailModal.data.cognitive }}</span></div>
+                        <div><span class="text-slate-400 block mb-1">应用场景</span><span class="font-medium text-slate-700">{{ detailModal.data.scenario }}</span></div>
+                        <div><span class="text-slate-400 block mb-1">试题难度</span><span class="font-medium" :class="getLevelTextColor(detailModal.data.level)">{{ getLevelName(detailModal.data.level) }}</span></div>
+                        <div><span class="text-slate-400 block mb-1">标签</span><div class="flex gap-1"><span v-for="tag in detailModal.data.tags" class="bg-white border border-slate-200 px-1.5 rounded">{{ tag }}</span></div></div>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
+        <!-- 2. Delete Confirmation Modal -->
+        <div v-if="modals.delete.show" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+            <div class="bg-white rounded-xl shadow-2xl w-96 p-6 animate-slide-up">
+                <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600 mb-4 mx-auto"><i class="ph-bold ph-warning text-2xl"></i></div>
+                <h3 class="text-lg font-bold text-slate-800 text-center mb-2">确认删除?</h3>
+                <p class="text-sm text-slate-500 text-center mb-6">您即将删除 <span class="font-bold text-slate-800">{{ modals.delete.count }}</span> 道试题。<br>此操作不可恢复，请谨慎操作。</p>
+                <div class="flex gap-3">
+                    <button @click="modals.delete.show = false" class="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors">取消</button>
+                    <button @click="executeDelete" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium shadow-md transition-colors">确认删除</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Toast -->
+        <div v-if="toast.show" class="fixed top-20 left-1/2 -translate-x-1/2 z-[110] animate-slide-up">
+            <div class="flex items-center gap-3 px-6 py-3 rounded-full shadow-lg border bg-slate-800 text-white border-slate-700">
+                <i class="ph-fill ph-check-circle text-green-400 text-xl"></i>
+                <span class="text-sm font-medium">{{ toast.message }}</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+        createApp({
+            setup() {
+                // --- State ---
+                const viewMode = ref('grid');
+                const filters = ref({ chapter: '', kp: [], type: '', level: '', search: '' });
+                const currentSort = ref('newest'); // 新增：当前排序规则
+                const detailModal = ref({ show: false, data: {} });
+                const modals = ref({ delete: { show: false, count: 0 } });
+                const toast = ref({ show: false, message: '' });
+                const selectedIds = ref([]);
+
+                // Combobox State
+                const isKpDropdownOpen = ref(false);
+                const kpSearchQuery = ref('');
+                const kpDropdownRef = ref(null);
+
+                // --- Data ---
+                const chapters = [
+                    { id: 'ch1', name: '第一章 线性表' },
+                    { id: 'ch2', name: '第二章 栈和队列' },
+                    { id: 'ch3', name: '第三章 树与二叉树' }
+                ];
+                const allKPs = [
+                    { id: 'kp1', name: '线性表的定义', chapterId: 'ch1' },
+                    { id: 'kp2', name: '链表操作', chapterId: 'ch1' },
+                    { id: 'kp3', name: '栈的存储', chapterId: 'ch2' },
+                    { id: 'kp4', name: '二叉树遍历', chapterId: 'ch3' }
+                ];
+
+                // 优化：增强数据，添加 createdTime 和 creator
+                const rawQuestions = [
+                    { 
+                        id: 1001, type: 'single', level: 'easy', kpId: 'kp1', 
+                        content: '在线性表的下列存储结构中，读取指定序号元素的时间复杂度为O(1)的是？',
+                        options: [{label:'A', content:'顺序表'}, {label:'B', content:'单链表'}, {label:'C', content:'双向链表'}, {label:'D', content:'循环链表'}],
+                        answer: ['A'], analysis: '顺序表底层是数组，支持随机访问。',
+                        chapterId: 'ch1', cognitive: '识记', source: '试题导入', scenario: '日常自测', tags: ['基础','常考'],
+                        createdTime: '2025-10-01', creator: '张老师'
+                    },
+                    { 
+                        id: 1002, type: 'essay', level: 'hard', kpId: 'kp4', 
+                        content: '请简述二叉树的前序遍历算法思想，并给出递归伪代码。',
+                        answer: '思想：根-左-右...', analysis: '略',
+                        chapterId: 'ch3', cognitive: '应用', source: 'AI生成', scenario: '终考', tags: ['算法','重点'],
+                        gradingCriteria: ['正确描述算法思想 (2分)', '伪代码逻辑正确 (3分)'],
+                        createdTime: '2025-10-05', creator: 'AI助教'
+                    },
+                    {
+                        id: 1003, type: 'multi', level: 'medium', kpId: 'kp3',
+                        content: '关于栈(Stack)的特性，以下说法正确的有？',
+                        options: [{label:'A', content:'先进后出'}, {label:'B', content:'表尾插入删除'}, {label:'C', content:'线性表'}, {label:'D', content:'只能用数组'}],
+                        answer: ['A','B','C'], analysis: 'D错误，栈也可用链表。',
+                        chapterId: 'ch2', cognitive: '理解', source: '手动录入', scenario: '形考', tags: ['概念辨析'],
+                        createdTime: '2025-09-20', creator: '李教授'
+                    },
+                    {
+                        id: 1004, type: 'fill', level: 'medium', kpId: 'kp2',
+                        content: '在单链表中，______节点没有前驱，______节点没有后继。',
+                        answer: '头 (Head), 尾 (Tail)', analysis: '单链表的头节点是序列的第一个节点，无前驱；尾节点是最后一个，next指针为空，无后继。',
+                        chapterId: 'ch1', cognitive: '识记', source: '试题导入', scenario: '日常自测', tags: ['基础'],
+                        createdTime: '2025-10-02', creator: '张老师'
+                    },
+                    {
+                        id: 1005, type: 'single', level: 'easy', kpId: 'kp4',
+                        content: '深度为 k 的二叉树最多有多少个节点？',
+                        options: [{label:'A', content:'2^k - 1'}, {label:'B', content:'2^(k-1)'}, {label:'C', content:'2k'}, {label:'D', content:'2^k'}],
+                        answer: ['A'], analysis: '二叉树第i层最多2^(i-1)个节点，累加得2^k - 1。',
+                        chapterId: 'ch3', cognitive: '识记', source: '手动录入', scenario: '日常自测', tags: ['基础公式'],
+                        createdTime: '2025-10-10', creator: '王老师'
+                    },
+                    {
+                        id: 1006, type: 'single', level: 'easy', kpId: 'kp3',
+                        content: '队列的特性是？',
+                        options: [{label:'A', content:'先进先出 (FIFO)'}, {label:'B', content:'先进后出 (LIFO)'}, {label:'C', content:'随机访问'}, {label:'D', content:'栈顶插入'}],
+                        answer: ['A'], analysis: '队列（Queue）遵循先进先出原则。',
+                        chapterId: 'ch2', cognitive: '识记', source: '试题导入', scenario: '形考', tags: ['概念'],
+                        createdTime: '2025-09-25', creator: 'AI助教'
+                    },
+                    {
+                        id: 1007, type: 'single', level: 'medium', kpId: 'kp2',
+                        content: '在单链表指针为p的节点之后插入指针为s的节点，操作是？',
+                        options: [{label:'A', content:'s->next=p->next; p->next=s;'}, {label:'B', content:'p->next=s; s->next=p->next;'}, {label:'C', content:'p->next=s->next;'}, {label:'D', content:'s->next=p;'}],
+                        answer: ['A'], analysis: '先连后断：先把s的后继设为p的原后继，再把p的后继设为s。',
+                        chapterId: 'ch1', cognitive: '应用', source: 'AI生成', scenario: '日常自测', tags: ['链表操作'],
+                        createdTime: '2025-11-01', creator: 'AI助教'
+                    },
+                    {
+                        id: 1008, type: 'single', level: 'medium', kpId: 'kp1',
+                        content: '线性表若采用链式存储结构时，要求内存中可用存储单元的地址？',
+                        options: [{label:'A', content:'必须是连续的'}, {label:'B', content:'部分地址必须是连续的'}, {label:'C', content:'一定是不连续的'}, {label:'D', content:'连续或不连续都可以'}],
+                        answer: ['D'], analysis: '链式存储不要求物理地址连续，通过指针连接。',
+                        chapterId: 'ch1', cognitive: '理解', source: 'AI生成', scenario: '日常自测', tags: ['存储结构'],
+                        createdTime: '2025-11-02', creator: 'AI助教'
+                    },
+                    {
+                        id: 1009, type: 'multi', level: 'medium', kpId: 'kp1',
+                        content: '以下属于线性表的是？',
+                        options: [{label:'A', content:'数组'}, {label:'B', content:'栈'}, {label:'C', content:'队列'}, {label:'D', content:'二叉树'}],
+                        answer: ['A','B','C'], analysis: '栈和队列是特殊的线性表，二叉树是非线性结构。',
+                        chapterId: 'ch1', cognitive: '理解', source: '手动录入', scenario: '形考', tags: ['数据结构分类'],
+                        createdTime: '2025-09-15', creator: '张老师'
+                    },
+                    {
+                        id: 1010, type: 'multi', level: 'hard', kpId: 'kp4',
+                        content: '二叉树遍历中，根节点可能排在最后的是？',
+                        options: [{label:'A', content:'前序遍历'}, {label:'B', content:'中序遍历'}, {label:'C', content:'后序遍历'}, {label:'D', content:'层次遍历'}],
+                        answer: ['C'], analysis: '后序遍历顺序是：左-右-根。',
+                        chapterId: 'ch3', cognitive: '理解', source: 'AI生成', scenario: '终考', tags: ['遍历顺序'],
+                        createdTime: '2025-12-01', creator: 'AI助教'
+                    },
+                    {
+                        id: 1011, type: 'multi', level: 'medium', kpId: 'kp3',
+                        content: '栈的应用场景包括？',
+                        options: [{label:'A', content:'递归调用'}, {label:'B', content:'表达式求值'}, {label:'C', content:'括号匹配'}, {label:'D', content:'CPU任务调度'}],
+                        answer: ['A','B','C'], analysis: 'CPU任务调度通常使用队列。',
+                        chapterId: 'ch2', cognitive: '应用', source: '试题导入', scenario: '日常自测', tags: ['应用场景'],
+                        createdTime: '2025-10-12', creator: '李教授'
+                    },
+                    {
+                        id: 1012, type: 'multi', level: 'easy', kpId: 'kp1',
+                        content: '链表相比数组的优点有？',
+                        options: [{label:'A', content:'插入删除方便'}, {label:'B', content:'随机访问速度快'}, {label:'C', content:'不需要连续内存'}, {label:'D', content:'空间利用率高'}],
+                        answer: ['A','C'], analysis: '链表插入删除只需修改指针（O(1)），且不要求连续内存。数组随机访问快。',
+                        chapterId: 'ch1', cognitive: '理解', source: 'AI生成', scenario: '日常自测', tags: ['对比分析'],
+                        createdTime: '2025-10-15', creator: 'AI助教'
+                    },
+                    {
+                        id: 1013, type: 'fill', level: 'medium', kpId: 'kp4',
+                        content: '一棵深度为5的满二叉树，其叶子节点的个数是______。',
+                        answer: '16', analysis: '满二叉树第k层有2^(k-1)个节点。第5层是叶子层，2^4 = 16。',
+                        chapterId: 'ch3', cognitive: '应用', source: '手动录入', scenario: '日常自测', tags: ['计算题'],
+                        createdTime: '2025-11-10', creator: '王老师'
+                    },
+                    {
+                        id: 1014, type: 'fill', level: 'medium', kpId: 'kp3',
+                        content: '若进栈序列为1,2,3,4，进栈过程中可以出栈，则不可能的出栈序列是______。',
+                        answer: '3,1,4,2', analysis: '3先出说明1,2还在栈中，此时栈顶是2，不能先出1。',
+                        chapterId: 'ch2', cognitive: '应用', source: '试题导入', scenario: '形考', tags: ['出栈序列'],
+                        createdTime: '2025-09-30', creator: '张老师'
+                    },
+                    {
+                        id: 1015, type: 'fill', level: 'easy', kpId: 'kp1',
+                        content: '算法的时间复杂度通常用______符号表示。',
+                        answer: 'O (大O记号)', analysis: '大O记号用于描述算法渐进时间复杂度。',
+                        chapterId: 'ch1', cognitive: '识记', source: 'AI生成', scenario: '日常自测', tags: ['基础概念'],
+                        createdTime: '2025-09-01', creator: 'AI助教'
+                    },
+                    {
+                        id: 1016, type: 'fill', level: 'hard', kpId: 'kp3',
+                        content: '循环队列队满的条件是______。',
+                        answer: '(rear + 1) % maxSize == front', analysis: '为了区分队空和队满，通常牺牲一个存储单元。',
+                        chapterId: 'ch2', cognitive: '理解', source: 'AI生成', scenario: '终考', tags: ['队列操作'],
+                        createdTime: '2025-11-20', creator: 'AI助教'
+                    },
+                    {
+                        id: 1017, type: 'essay', level: 'medium', kpId: 'kp3',
+                        content: '什么是递归？递归函数的两个必要条件是什么？',
+                        answer: '递归是指函数调用自身。\n必要条件：\n1. 基准情形（Base Case）：不用递归就能求解的终止条件。\n2. 递归推进：将问题分解为更小的子问题，逐步逼近基准情形。', analysis: '略',
+                        chapterId: 'ch2', cognitive: '理解', source: '试题导入', scenario: '日常自测', tags: ['递归'],
+                        gradingCriteria: ['定义正确 (2分)', '写出基准情形 (2分)', '写出递归推进 (1分)'],
+                        createdTime: '2025-10-08', creator: '张老师'
+                    },
+                    {
+                        id: 1018, type: 'essay', level: 'hard', kpId: 'kp4',
+                        content: '简述B-树（B-tree）的定义及其在数据库索引中的优势。',
+                        answer: '定义：B-树是一种多路平衡查找树...\n优势：减少磁盘I/O次数，适合大规模数据存储。', analysis: '略',
+                        chapterId: 'ch3', cognitive: '理解', source: 'AI生成', scenario: '终考', tags: ['高级数据结构'],
+                        gradingCriteria: ['定义准确 (3分)', '解释磁盘IO优势 (2分)'],
+                        createdTime: '2025-12-05', creator: 'AI助教'
+                    },
+                    {
+                        id: 1019, type: 'essay', level: 'hard', kpId: 'kp3',
+                        content: '汉诺塔问题的时间复杂度是多少？请简单推导。',
+                        answer: '时间复杂度是 O(2^n)。\n推导：T(n) = 2T(n-1) + 1，递推可得 T(n) = 2^n - 1。', analysis: '略',
+                        chapterId: 'ch2', cognitive: '应用', source: '手动录入', scenario: '形考', tags: ['算法分析'],
+                        gradingCriteria: ['结果正确 (2分)', '推导过程清晰 (3分)'],
+                        createdTime: '2025-11-25', creator: '李教授'
+                    },
+                    {
+                        id: 1020, type: 'essay', level: 'medium', kpId: 'kp2',
+                        content: '请描述如何就地反转一个单链表（不使用额外空间）。',
+                        answer: '使用三个指针 prev, curr, next。\n1. 初始化 prev=null, curr=head。\n2. 循环直到 curr 为空：\n   next = curr->next;\n   curr->next = prev;\n   prev = curr;\n   curr = next;\n3. 返回 prev 作为新头节点。', analysis: '略',
+                        chapterId: 'ch1', cognitive: '应用', source: 'AI生成', scenario: '日常自测', tags: ['经典算法'],
+                        gradingCriteria: ['指针使用正确 (2分)', '循环逻辑清晰 (2分)', '边界处理正确 (1分)'],
+                        createdTime: '2025-10-30', creator: 'AI助教'
+                    },
+                    {
+                        id: 1021, type: 'single', level: 'hard', kpId: 'kp4',
+                        content: '在一个非空二叉树的中序遍历序列中，根节点的左边？',
+                        options: [{label:'A', content:'只有左子树的节点'}, {label:'B', content:'只有右子树的节点'}, {label:'C', content:'包含左子树所有节点'}, {label:'D', content:'包含右子树所有节点'}],
+                        answer: ['C'], analysis: '中序遍历顺序是：左子树 -> 根 -> 右子树。',
+                        chapterId: 'ch3', cognitive: '理解', source: '试题导入', scenario: '终考', tags: ['遍历性质'],
+                        createdTime: '2025-12-02', creator: '王老师'
+                    },
+                    {
+                        id: 1022, type: 'multi', level: 'medium', kpId: 'kp2',
+                        content: '双向链表的节点结构包含哪些指针？',
+                        options: [{label:'A', content:'next (后继)'}, {label:'B', content:'prior (前驱)'}, {label:'C', content:'top (栈顶)'}, {label:'D', content:'parent (父节点)'}],
+                        answer: ['A','B'], analysis: '双向链表每个节点有两个指针域，分别指向前驱和后继。',
+                        chapterId: 'ch1', cognitive: '识记', source: '手动录入', scenario: '日常自测', tags: ['链表结构'],
+                        createdTime: '2025-09-18', creator: '李教授'
+                    },
+                    {
+                        id: 1023, type: 'fill', level: 'medium', kpId: 'kp1',
+                        content: '常见的线性表链式存储结构有______和______。',
+                        answer: '单链表, 双链表', analysis: '列举任意两种即可，答案不分先后。',
+                        chapterId: 'ch1', cognitive: '识记', source: 'AI生成', scenario: '日常自测', tags: ['基础分类'],
+                        orderLimit: 'no',
+                        createdTime: '2025-09-05', creator: 'AI助教'
+                    },
+                    {
+                        id: 1024, type: 'essay', level: 'hard', kpId: 'kp4',
+                        content: '什么是平衡二叉树（AVL树）？它如何解决二叉排序树退化的问题？',
+                        answer: '定义：任意节点的左右子树高度差绝对值不超过1。\n解决：通过旋转操作（LL, RR, LR, RL）在插入删除时维持平衡，保证查找效率为O(log n)。', analysis: '略',
+                        chapterId: 'ch3', cognitive: '理解', source: '手动录入', scenario: '终考', tags: ['平衡树'],
+                        gradingCriteria: ['定义平衡因子 (2分)', '提到旋转操作 (2分)', '提到时间复杂度 (1分)'],
+                        createdTime: '2025-12-08', creator: '王老师'
+                    },
+                    {
+                        id: 1025, type: 'single', level: 'medium', kpId: 'kp4',
+                        content: '在有向无环图(DAG)中，若存在路径 <i, j>，则在拓扑排序序列中节点 i 必须出现在节点 j 之前。这种排序称为？',
+                        options: [{label:'A', content:'选择排序'}, {label:'B', content:'拓扑排序'}, {label:'C', content:'快速排序'}, {label:'D', content:'基数排序'}],
+                        answer: ['B'], analysis: '拓扑排序是针对有向无环图的一种排序算法，满足前驱后继关系。',
+                        chapterId: 'ch3', cognitive: '理解', source: '手动录入', scenario: '形考', tags: ['图论', '排序'],
+                        createdTime: '2025-11-28', creator: '李教授'
+                    },
+                    {
+                        id: 1026, type: 'multi', level: 'hard', kpId: 'kp1',
+                        content: '以下排序算法中，属于稳定排序算法的是？',
+                        options: [{label:'A', content:'冒泡排序'}, {label:'B', content:'快速排序'}, {label:'C', content:'直接插入排序'}, {label:'D', content:'堆排序'}],
+                        answer: ['A','C'], analysis: '快速排序和堆排序是不稳定的；冒泡排序和插入排序是稳定的。',
+                        chapterId: 'ch1', cognitive: '识记', source: 'AI生成', scenario: '终考', tags: ['排序算法', '稳定性'],
+                        createdTime: '2025-12-10', creator: 'AI助教'
+                    },
+                    {
+                        id: 1027, type: 'fill', level: 'easy', kpId: 'kp1',
+                        content: '在长度为n的有序顺序表中进行二分查找，最坏情况下的时间复杂度为______。',
+                        answer: 'O(log n)', analysis: '二分查找每次将搜索范围缩小一半，高度为log n。',
+                        chapterId: 'ch1', cognitive: '理解', source: '试题导入', scenario: '日常自测', tags: ['查找', '复杂度'],
+                        orderLimit: 'no',
+                        createdTime: '2025-09-12', creator: '张老师'
+                    },
+                    {
+                        id: 1028, type: 'essay', level: 'hard', kpId: 'kp3',
+                        content: '简述哈夫曼树（Huffman Tree）的构建过程。',
+                        answer: '1. 将所有权值看作森林中独立的树根。\n2. 选择权值最小的两棵树合并，新树根权值为两者之和。\n3. 将新树放回森林，重复步骤2，直到只剩一棵树。', analysis: '哈夫曼树是带权路径长度最短的二叉树。',
+                        chapterId: 'ch3', cognitive: '应用', source: '手动录入', scenario: '终考', tags: ['最优二叉树'],
+                        gradingCriteria: ['选最小权值 (2分)', '合并过程描述准确 (2分)', '重复步骤直至完成 (1分)'],
+                        createdTime: '2025-12-12', creator: '王老师'
+                    },
+                    {
+                        id: 2001, type: 'judge', level: 'easy', kpId: 'kp1',
+                        content: '线性表采用链式存储结构时，要求内存中可用的存储单元地址必须是连续的。',
+                        options: [{label:'A', content:'正确'}, {label:'B', content:'错误'}],
+                        answer: ['B'], analysis: '链式存储结构通过指针连接，不要求物理地址连续。',
+                        chapterId: 'ch1', cognitive: '识记', source: 'AI生成', scenario: '日常自测', tags: ['存储结构'],
+                        createdTime: '2025-09-08', creator: 'AI助教'
+                    },
+                    {
+                        id: 2002, type: 'judge', level: 'easy', kpId: 'kp3',
+                        content: '栈是一种先进先出（FIFO）的线性表。',
+                        options: [{label:'A', content:'正确'}, {label:'B', content:'错误'}],
+                        answer: ['B'], analysis: '栈是后进先出（LIFO）的线性表，队列才是先进先出。',
+                        chapterId: 'ch2', cognitive: '识记', source: '试题导入', scenario: '形考', tags: ['基础概念'],
+                        createdTime: '2025-09-22', creator: '张老师'
+                    },
+                    {
+                        id: 2003, type: 'judge', level: 'medium', kpId: 'kp4',
+                        content: '一棵满二叉树一定是一棵完全二叉树。',
+                        options: [{label:'A', content:'正确'}, {label:'B', content:'错误'}],
+                        answer: ['A'], analysis: '满二叉树是所有层都满的二叉树，符合完全二叉树的定义。',
+                        chapterId: 'ch3', cognitive: '理解', source: 'AI生成', scenario: '日常自测', tags: ['二叉树性质'],
+                        createdTime: '2025-10-18', creator: 'AI助教'
+                    },
+                    {
+                        id: 2004, type: 'judge', level: 'hard', kpId: 'kp2',
+                        content: '在单链表中，如果要访问某个节点的前驱节点，时间复杂度为O(1)。',
+                        options: [{label:'A', content:'正确'}, {label:'B', content:'错误'}],
+                        answer: ['B'], analysis: '单链表只有后继指针，访问前驱需要从头遍历，时间复杂度为O(n)。双向链表才是O(1)。',
+                        chapterId: 'ch1', cognitive: '理解', source: '手动录入', scenario: '终考', tags: ['复杂度分析'],
+                        createdTime: '2025-11-05', creator: '李教授'
+                    },
+                    {
+                        id: 2005, type: 'judge', level: 'medium', kpId: 'kp3',
+                        content: '队列的插入操作只能在表尾进行，删除操作只能在表头进行。',
+                        options: [{label:'A', content:'正确'}, {label:'B', content:'错误'}],
+                        answer: ['A'], analysis: '这是队列的基本定义。',
+                        chapterId: 'ch2', cognitive: '识记', source: '试题导入', scenario: '形考', tags: ['队列操作'],
+                        createdTime: '2025-09-28', creator: '张老师'
+                    },
+                    {
+                        id: 2006, type: 'judge', level: 'hard', kpId: 'kp4',
+                        content: '哈夫曼树中不存在度为1的结点。',
+                        options: [{label:'A', content:'正确'}, {label:'B', content:'错误'}],
+                        answer: ['A'], analysis: '哈夫曼树是正则二叉树，构建过程中每次合并两个树，因此只有度为0和度为2的结点。',
+                        chapterId: 'ch3', cognitive: '应用', source: 'AI生成', scenario: '终考', tags: ['哈夫曼树'],
+                        createdTime: '2025-12-15', creator: 'AI助教'
+                    }
+                ];
+
+                const questions = ref(rawQuestions.map(q => {
+                    const kp = allKPs.find(k => k.id === q.kpId);
+                    const ch = chapters.find(c => c.id === q.chapterId);
+                    return { ...q, kpName: kp ? kp.name : '', chapterName: ch ? ch.name : '' };
+                }));
+
+                // --- Computed ---
+                const filteredKpList = computed(() => {
+                    let list = allKPs;
+                    if (filters.value.chapter) list = list.filter(k => k.chapterId === filters.value.chapter);
+                    if (kpSearchQuery.value) list = list.filter(k => k.name.toLowerCase().includes(kpSearchQuery.value.toLowerCase()));
+                    return list;
+                });
+
+                const kpPlaceholder = computed(() => {
+                    return filters.value.kp.length > 0 ? `已选 ${filters.value.kp.length} 个知识点` : '搜索或选择知识点';
+                });
+
+                // 优化：增加排序逻辑
+                const filteredQuestions = computed(() => {
+                    let result = questions.value.filter(q => {
+                        return (!filters.value.chapter || q.chapterId === filters.value.chapter) &&
+                               (filters.value.kp.length === 0 || filters.value.kp.includes(q.kpId)) &&
+                               (!filters.value.type || q.type === filters.value.type) &&
+                               (!filters.value.level || q.level === filters.value.level) &&
+                               (!filters.value.search || q.content.includes(filters.value.search));
+                    });
+
+                    // 排序逻辑
+                    const levelOrder = { 'easy': 1, 'medium': 2, 'hard': 3 };
+                    
+                    return result.sort((a, b) => {
+                        switch (currentSort.value) {
+                            case 'newest':
+                                return new Date(b.createdTime) - new Date(a.createdTime);
+                            case 'oldest':
+                                return new Date(a.createdTime) - new Date(b.createdTime);
+                            case 'level-asc':
+                                return levelOrder[a.level] - levelOrder[b.level];
+                            case 'level-desc':
+                                return levelOrder[b.level] - levelOrder[a.level];
+                            default:
+                                return 0;
+                        }
+                    });
+                });
+
+                const isAllSelected = computed(() => filteredQuestions.value.length > 0 && selectedIds.value.length === filteredQuestions.value.length);
+
+                // --- Methods ---
+                const toggleKp = (kp) => {
+                    const idx = filters.value.kp.indexOf(kp.id);
+                    if (idx > -1) filters.value.kp.splice(idx, 1);
+                    else filters.value.kp.push(kp.id);
+                };
+                
+                const applyKpFilter = (q) => {
+                    filters.value.kp = [q.kpId];
+                    kpSearchQuery.value = '';
+                    showToast(`已筛选知识点: ${q.kpName}`);
+                };
+
+                const getCount = (field, value) => !value ? questions.value.length : questions.value.filter(q => q[field] === value).length;
+                
+                const openDetail = (q) => { detailModal.value.data = q; detailModal.value.show = true; };
+                
+                const toggleSelect = (id) => {
+                    const idx = selectedIds.value.indexOf(id);
+                    if (idx > -1) selectedIds.value.splice(idx, 1);
+                    else selectedIds.value.push(id);
+                };
+
+                const toggleSelectAll = () => {
+                    selectedIds.value = isAllSelected.value ? [] : filteredQuestions.value.map(q => q.id);
+                };
+
+                const confirmDeleteSingle = (q) => { selectedIds.value = [q.id]; openDeleteModal(); };
+                
+                const openDeleteModal = () => { modals.value.delete = { show: true, count: selectedIds.value.length }; };
+                
+                const executeDelete = () => {
+                    questions.value = questions.value.filter(q => !selectedIds.value.includes(q.id));
+                    showToast(`成功删除 ${modals.value.delete.count} 道试题`);
+                    modals.value.delete.show = false; selectedIds.value = [];
+                };
+
+                const handleBulkExport = () => { showToast(`开始导出 ${selectedIds.value.length} 道试题...`); selectedIds.value = []; };
+
+                const generateQuiz = () => { showToast('正在进入测验活动编辑页面...'); };
+                
+                const showToast = (msg) => { toast.value = { show: true, message: msg }; setTimeout(() => toast.value.show = false, 3000); };
+                
+                // 优化：跳转到工作台
+                const triggerAiWorkbench = () => {
+                    showToast('正在前往 AI 沉浸工作台...');
+                    setTimeout(() => {
+                        window.location.href = '2.智能出题工作台new.html';
+                    }, 800);
+                };
+
+                const handleClickOutside = (e) => {
+                    if (kpDropdownRef.value && !kpDropdownRef.value.contains(e.target)) {
+                        isKpDropdownOpen.value = false;
+                    }
+                };
+
+                onMounted(() => document.addEventListener('click', handleClickOutside));
+                onUnmounted(() => document.removeEventListener('click', handleClickOutside));
+
+                // --- Constants ---
+                const typeOptions = [{label:'全部', value:''}, {label:'单选', value:'single'}, {label:'多选', value:'multi'}, {label:'判断', value:'judge'}, {label:'填空', value:'fill'}, {label:'简答', value:'essay'}];
+                const levelOptions = [{label:'全部', value:''}, {label:'简单', value:'easy'}, {label:'中等', value:'medium'}, {label:'困难', value:'hard'}];
+
+                // Helpers
+                const getTypeName = (t) => ({single:'单选题', multi:'多选题', fill:'填空题', essay:'简答题', judge:'判断题'}[t]);
+                const getTypeBadgeClass = (t) => ({
+                    single: 'bg-brand-50 text-brand-600 border-brand-200', 
+                    multi: 'bg-purple-50 text-purple-600 border-purple-200', 
+                    fill: 'bg-orange-50 text-orange-600 border-orange-200',
+                    essay: 'bg-amber-50 text-amber-600 border-amber-200',
+                    judge: 'bg-cyan-50 text-cyan-600 border-cyan-200'
+                }[t]);
+                const getLevelName = (l) => ({easy:'简单', medium:'中等', hard:'困难'}[l]);
+                const getLevelDotColor = (l) => ({easy:'bg-emerald-400', medium:'bg-blue-400', hard:'bg-rose-400'}[l]);
+                const getLevelTextColor = (l) => ({easy:'text-emerald-600', medium:'text-blue-600', hard:'text-rose-600'}[l]);
+                
+                const getOrderLimitLabel = (val) => ({yes: '是', no: '否', partial: '部分'}[val] || val);
+
+                return {
+                    viewMode, filters, currentSort, isKpDropdownOpen, kpSearchQuery, kpDropdownRef, kpPlaceholder,
+                    chapters, filteredKpList, filteredQuestions, detailModal, modals, toast, selectedIds, isAllSelected,
+                    typeOptions, levelOptions,
+                    toggleKp, getCount, openDetail, toggleSelect, toggleSelectAll, confirmDeleteSingle, openDeleteModal, executeDelete, 
+                    handleBulkExport, generateQuiz, showToast, triggerAiWorkbench, applyKpFilter,
+                    getTypeName, getTypeBadgeClass, getLevelName, getLevelDotColor, getLevelTextColor, getOrderLimitLabel
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

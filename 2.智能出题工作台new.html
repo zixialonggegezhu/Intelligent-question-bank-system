@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 沉浸工作台 v3.0 | 2025 秋期中考试题生产</title>
+    
+    <!-- 核心依赖 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/MotionPathPlugin.min.js"></script>
+
+    <!-- 配置主题 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' },
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    animation: {
+                        'shimmer': 'shimmer 2s linear infinite',
+                        'scan': 'scan 2s linear infinite',
+                    },
+                    keyframes: {
+                        shimmer: { '0%': { backgroundPosition: '-1000px 0' }, '100%': { backgroundPosition: '1000px 0' } },
+                        scan: { '0%': { transform: 'translateX(-100%)' }, '100%': { transform: 'translateX(100%)' } }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* 基础设置 */
+        body { overflow: hidden; background: #f8fafc; font-family: 'Inter', sans-serif; user-select: none; }
+        .user-select-text { user-select: text; }
+        
+        /* 滚动条 */
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* 左侧文档高亮 */
+        .highlight-source { background-color: #fef08a; border-bottom: 2px solid #eab308; cursor: pointer; transition: all 0.3s; }
+        .highlight-source.active-link { background-color: #fde047; box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.3); }
+
+        /* SVG 连接层 */
+        #connection-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 40; }
+        .connection-path { fill: none; stroke: #fbbf24; stroke-width: 2; stroke-dasharray: 6; animation: dash 30s linear infinite; opacity: 0.6; }
+        @keyframes dash { to { stroke-dashoffset: -1000; } }
+
+        /* 卡片动画 */
+        .card-enter-active, .card-leave-active { transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .card-enter-from { opacity: 0; transform: translateY(20px) scale(0.95); }
+        .card-leave-to { opacity: 0; transform: translateX(-50px) scale(0.9); }
+        
+        /* 骨架屏 */
+        .skeleton-bg {
+            background: #f1f5f9;
+            background-image: linear-gradient(to right, #f1f5f9 0%, #e2e8f0 20%, #f1f5f9 40%, #f1f5f9 100%);
+            background-repeat: no-repeat;
+            background-size: 1000px 100%; 
+            animation: shimmer 1.5s infinite linear; 
+        }
+
+        /* 拖拽区域 */
+        .drop-active { border-color: #6366f1 !important; background-color: #eef2ff !important; }
+
+        /* OCR 扫光动画 */
+        .ocr-scan-line {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+            transform: skewX(-20deg) translateX(-150%);
+            animation: scan 1.5s infinite;
+        }
+
+        /* 浮动菜单 */
+        .float-menu { animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+<div id="app" class="h-screen w-screen flex flex-col overflow-hidden text-slate-700">
+
+    <!-- 0. SVG 连接线层 -->
+    <svg id="connection-layer">
+        <path v-for="line in connectionLines" :key="line.id" :d="line.d" class="connection-path" />
+    </svg>
+
+    <!-- 1. 顶栏 (Header) -->
+    <header class="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 shrink-0 z-50 shadow-sm relative">
+        <div class="flex items-center gap-4">
+            <!-- [关键修复] 添加返回点击事件 -->
+            <button @click="goBack" class="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
+                <i class="ph-bold ph-arrow-left text-lg"></i>
+            </button>
+            <div class="h-5 w-px bg-slate-200"></div>
+            <div>
+                <h1 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    2025 秋期中考试题生产
+                    <span class="px-2 py-0.5 rounded-full bg-green-50 text-green-600 text-[10px] border border-green-100 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> 进行中
+                    </span>
+                </h1>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div class="text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100 flex items-center gap-2">
+                <span>本次会话已生成 <strong class="text-slate-800">{{ sessionStats.generated }}</strong> 题</span>
+                <span class="w-px h-3 bg-slate-300"></span>
+                <span>待入库 <strong class="text-brand-600">{{ sessionStats.pending }}</strong> 题</span>
+            </div>
+            
+            <button @click="saveAllCards" :disabled="sessionStats.pending === 0" 
+                class="flex items-center gap-2 px-4 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 shadow-lg shadow-slate-200">
+                <i class="ph-bold ph-check-circle"></i> 全部入库
+            </button>
+
+            <!-- 试题库图标 (入库动画终点) -->
+            <!-- [关键修复] 添加点击事件 -->
+            <div ref="libraryIcon" @click="goBack" class="relative p-2 text-slate-400 hover:text-brand-600 cursor-pointer transition-transform duration-300 ml-2" :class="{'scale-125 text-brand-600': isLibraryAnimating}">
+                <i class="ph-fill ph-files text-xl"></i>
+                <div v-if="libraryCount > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold shadow-sm border-2 border-white">
+                    {{ libraryCount > 99 ? '99+' : libraryCount }}
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主体三栏布局 -->
+    <div class="flex-1 flex overflow-hidden relative">
+        
+        <!-- =======================
+             2.1 左栏：资源与上下文 (Context) - 25%
+             ======================= -->
+        <aside class="w-1/4 min-w-[320px] bg-white border-r border-slate-200 flex flex-col z-10 relative shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
+            <div class="flex border-b border-slate-100">
+                <button @click="leftTab = 'list'" :class="leftTab === 'list' ? 'text-brand-600 border-brand-600 bg-brand-50/50' : 'text-slate-500 border-transparent hover:text-slate-700'" class="flex-1 py-3 text-xs font-medium border-b-2 transition-colors flex items-center justify-center gap-2">
+                    <i class="ph ph-list-dashes"></i> 知识列表
+                </button>
+                <button @click="leftTab = 'doc'" :class="leftTab === 'doc' ? 'text-brand-600 border-brand-600 bg-brand-50/50' : 'text-slate-500 border-transparent hover:text-slate-700'" class="flex-1 py-3 text-xs font-medium border-b-2 transition-colors flex items-center justify-center gap-2">
+                    <i class="ph ph-book-open-text"></i> 电子教材
+                </button>
+            </div>
+
+            <!-- Tab: Knowledge Tree -->
+            <div v-if="leftTab === 'list'" class="flex-1 overflow-y-auto custom-scroll p-2">
+                <div v-for="node in knowledgeTree" :key="node.id" class="mb-1">
+                    <div @click="toggleNode(node)" 
+                         class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors text-sm group"
+                         :class="currentNode?.id === node.id ? 'bg-brand-50 text-brand-700' : 'hover:bg-slate-50 text-slate-600'">
+                        <i class="ph" :class="node.children ? (node.expanded ? 'ph-caret-down' : 'ph-caret-right') : 'ph-dot-outline'"></i>
+                        <span class="font-medium">{{ node.title }}</span>
+                        <button v-if="currentNode?.id === node.id" class="ml-auto text-brand-500 text-xs bg-white px-1.5 py-0.5 rounded border border-brand-200 shadow-sm">锁定中</button>
+                    </div>
+                    <div v-if="node.expanded && node.children" class="pl-4 border-l border-slate-100 ml-2.5">
+                        <div v-for="child in node.children" :key="child.id" 
+                             @click="lockKnowledge(child)"
+                             class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors text-xs mt-1"
+                             :class="currentNode?.id === child.id ? 'bg-brand-50 text-brand-700 font-medium' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'">
+                             <i class="ph-fill ph-circle text-[6px]" :class="currentNode?.id === child.id ? 'text-brand-500' : 'text-slate-300'"></i>
+                             {{ child.title }}
+                             <i v-if="currentNode?.id === child.id" class="ph-bold ph-lock-key ml-auto text-brand-500"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Document (RAG Core) -->
+            <div v-else class="flex-1 overflow-y-auto custom-scroll p-6 relative user-select-text" ref="docContainer" @mouseup="handleTextSelection">
+                <div class="prose prose-sm max-w-none text-slate-600 leading-7 select-text" id="pdf-content">
+                    <h3 class="text-slate-800 font-bold mb-4 text-base">第三章 洋务运动与中国近代化</h3>
+                    <p class="mb-6 hover:bg-slate-50 p-2 rounded transition-colors" data-pid="p1">
+                        <span id="source-p1">洋务运动，又称自强运动。是19世纪60年代到90年代晚清洋务派所进行的一场引进西方军事装备、机器生产和科学技术以挽救清朝统治的自救运动。</span>
+                    </p>
+                    <p class="mb-6 hover:bg-slate-50 p-2 rounded transition-colors" data-pid="p2">
+                        <span id="source-p2">洋务运动前期口号为“自强”，后期口号为“求富”。主要内容包括：创办军事工业、创办民用工业、筹划海防、培养人才。</span>
+                    </p>
+                    <p class="mb-6 hover:bg-slate-50 p-2 rounded transition-colors" data-pid="p3">
+                        <span id="source-p3">其中，曾国藩创办的安庆内军械所是洋务派创办的第一个军事工业；李鸿章创办的江南制造总局是最大的军事工业。</span>
+                    </p>
+                    <p class="mb-6 hover:bg-slate-50 p-2 rounded transition-colors" data-pid="p4">
+                        <span id="source-p4">洋务运动失败的根本原因在于：只引进西方技术，而不改变封建制度（中学为体，西学为用）。它没有使中国富强起来，但引进了西方先进的科学技术，使中国出现了第一批近代企业，在客观上为中国民族资本主义的产生和发展起到了促进作用。</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- RAG 划词悬浮菜单 -->
+            <div v-if="selectionMenu.show" :style="{ top: selectionMenu.y + 'px', left: selectionMenu.x + 'px' }" 
+                 class="fixed z-[60] bg-slate-900 text-white rounded-lg shadow-2xl py-1.5 px-2 flex items-center gap-2 float-menu transform -translate-x-1/2 -translate-y-full mt-[-8px]">
+                <button @click="triggerRagGeneration" class="flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-700 rounded-md text-xs font-bold transition-colors bg-brand-600">
+                    <i class="ph-fill ph-sparkle text-yellow-300"></i> AI 出题
+                </button>
+                <div class="w-px h-4 bg-slate-700"></div>
+                <button class="p-1.5 hover:bg-slate-700 rounded-md text-slate-300 hover:text-white" title="加入素材库"><i class="ph-bold ph-bookmark-simple"></i></button>
+            </div>
+        </aside>
+
+        <!-- =======================
+             2.2 中栏：生产画布 (Canvas) - 50%
+             ======================= -->
+        <main class="w-2/4 bg-slate-50 flex flex-col relative z-0 shadow-inner" ref="middleColumn" @scroll="updateConnectionLines">
+            
+            <!-- 顶部常驻输入框 -->
+            <div class="shrink-0 px-6 py-4 sticky top-0 z-30 bg-[#f8fafc]/90 backdrop-blur-md border-b border-slate-100">
+                <!-- 知识点提示 -->
+                <div v-if="currentNode" class="flex items-center gap-2 mb-2 text-xs animate-slide-down">
+                    <span class="text-slate-400">当前归属知识点:</span>
+                    <span class="bg-brand-50 text-brand-700 px-2 py-0.5 rounded border border-brand-100 flex items-center gap-1 font-medium">
+                        {{ currentNode.title }}
+                        <button @click="currentNode = null" class="hover:text-red-500"><i class="ph-bold ph-x"></i></button>
+                    </span>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-1.5 flex items-center focus-within:ring-2 focus-within:ring-brand-500/20 focus-within:border-brand-500 transition-all gap-2">
+                    <!-- 题型选择下拉 -->
+                    <div class="relative group shrink-0">
+                         <select v-model="quickType" class="appearance-none bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium rounded-lg py-2 pl-3 pr-8 focus:outline-none focus:border-brand-500 cursor-pointer hover:bg-slate-100 transition-colors">
+                            <option value="single">单选题</option>
+                            <option value="multi">多选题</option>
+                            <option value="fill">填空题</option>
+                            <option value="essay">简答题</option>
+                         </select>
+                         <i class="ph-bold ph-caret-down absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs"></i>
+                    </div>
+
+                    <input v-model="quickInput" @keyup.enter="addManualCard" type="text" placeholder="输入题目内容 (回车直接生成，不输入则生成空白卡片)..." class="flex-1 text-sm bg-transparent outline-none text-slate-700 placeholder:text-slate-400">
+                    
+                    <button @click="addManualCard" class="p-2 bg-brand-50 hover:bg-brand-100 text-brand-600 rounded-lg transition-colors shadow-sm">
+                        <i class="ph-bold ph-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 试题卡片流 (Feed) -->
+            <div class="flex-1 overflow-y-auto custom-scroll px-6 pb-24 space-y-6 pt-2" id="card-feed">
+                <transition-group name="card">
+                    <div v-for="(card, index) in cards" :key="card.id" :id="'card-' + card.id" :ref="el => { if(el) cardRefs[card.id] = el }"
+                         class="bg-white rounded-xl border transition-all duration-300 relative group shadow-sm"
+                         :class="[
+                             card.status === 'locked' ? 'border-slate-200 bg-slate-50 opacity-90' : 'border-slate-200 hover:border-brand-300 hover:shadow-md',
+                             card.isStreaming ? 'border-brand-200 ring-4 ring-brand-50/20' : ''
+                         ]">
+                        
+                        <!-- 徽章与状态 -->
+                        <div class="absolute top-0 right-0 z-10">
+                             <div v-if="card.status === 'locked'" class="bg-slate-200 text-slate-500 text-[10px] px-3 py-1 rounded-bl-xl rounded-tr-xl font-bold flex items-center gap-1">
+                                <i class="ph-bold ph-check"></i> 已入库
+                            </div>
+                            <div v-else-if="card.ocr" class="bg-orange-50 text-orange-600 text-[10px] px-3 py-1 rounded-bl-xl rounded-tr-xl font-bold flex items-center gap-1 overflow-hidden relative">
+                                <i class="ph-bold ph-scan"></i> OCR 识别
+                                <div class="ocr-scan-line"></div>
+                            </div>
+                            <div v-else-if="card.status === 'generated'" class="bg-brand-50 text-brand-600 text-[10px] px-3 py-1 rounded-bl-xl rounded-tr-xl font-bold flex items-center gap-1">
+                                <i class="ph-fill ph-sparkle"></i> AI 生成
+                            </div>
+                        </div>
+
+                        <!-- 侧边工具条 (Hover显示) -->
+                        <div v-if="card.status !== 'locked'" class="absolute -right-12 top-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                             <button @click="regenerateVariant(card)" class="p-2 bg-white border border-slate-200 shadow-sm rounded-lg text-slate-400 hover:text-brand-600 hover:border-brand-200 transition-colors tooltip-left" title="生成相似题">
+                                <i class="ph-bold ph-copy"></i>
+                             </button>
+                             <button @click="deleteCard(card.id)" class="p-2 bg-white border border-slate-200 shadow-sm rounded-lg text-slate-400 hover:text-red-500 hover:border-red-200 transition-colors tooltip-left" title="丢弃">
+                                <i class="ph-bold ph-trash"></i>
+                             </button>
+                        </div>
+
+                        <!-- 卡片内容区 -->
+                        <div class="p-6">
+                            <!-- 1. 题干与基础属性 -->
+                            <div class="mb-4">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border" :class="getTypeBadgeClass(card.type)">
+                                        {{ getTypeName(card.type) }}
+                                    </span>
+                                    <span class="text-xs text-slate-400 flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                                        <span class="w-1.5 h-1.5 rounded-full" :class="getLevelColor(card.difficulty)"></span>
+                                        {{ card.difficulty }}
+                                    </span>
+                                </div>
+
+                                <!-- 骨架屏 -->
+                                <div v-if="card.isStreaming" class="space-y-3 py-2">
+                                    <div class="h-4 skeleton-bg rounded w-3/4"></div>
+                                    <div class="h-4 skeleton-bg rounded w-full"></div>
+                                    <div class="h-4 skeleton-bg rounded w-1/2"></div>
+                                </div>
+                                
+                                <!-- 题干编辑 (支持挖空) -->
+                                <div v-else 
+                                     @mouseup="handleCardTextSelect($event, card)"
+                                     :contenteditable="card.status !== 'locked'"
+                                     class="text-sm font-medium text-slate-800 leading-relaxed outline-none focus:bg-yellow-50/50 p-2 -m-2 rounded transition-colors whitespace-pre-wrap min-h-[40px] user-select-text"
+                                     v-html="card.content">
+                                </div>
+                            </div>
+
+                            <!-- 2. 题型特定区域 -->
+                            <div v-if="!card.isStreaming" class="space-y-4">
+                                
+                                <!-- 单选/多选 -->
+                                <div v-if="['single', 'multi'].includes(card.type)" class="space-y-2">
+                                    <div v-for="(opt, idx) in card.options" :key="idx" 
+                                         class="flex items-start gap-3 p-2 rounded-lg border border-transparent transition-colors group/opt"
+                                         :class="[card.status !== 'locked' ? 'hover:bg-slate-50 cursor-pointer' : '', card.answer.includes(opt.label) ? 'bg-green-50/60 border-green-100' : '']"
+                                         @click="card.status !== 'locked' && toggleOption(card, opt.label)">
+                                        
+                                        <div class="mt-0.5 w-5 h-5 rounded flex items-center justify-center text-xs font-bold border transition-colors shrink-0"
+                                             :class="[
+                                                card.type === 'single' ? 'rounded-full' : 'rounded',
+                                                card.answer.includes(opt.label) ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-slate-300 text-slate-400'
+                                             ]">
+                                            <i v-if="card.type==='multi' && card.answer.includes(opt.label)" class="ph-bold ph-check text-[10px]"></i>
+                                            <span v-else-if="card.type==='single' || !card.answer.includes(opt.label)">{{ opt.label }}</span>
+                                        </div>
+                                        
+                                        <div class="flex-1 text-sm text-slate-600 outline-none" :contenteditable="card.status !== 'locked'">{{ opt.text }}</div>
+                                        
+                                        <button v-if="card.status !== 'locked'" @click.stop="removeOption(card, idx)" class="opacity-0 group-hover/opt:opacity-100 text-slate-300 hover:text-red-500 p-1">
+                                            <i class="ph-bold ph-trash"></i>
+                                        </button>
+                                    </div>
+                                    <div v-if="card.status !== 'locked'" class="pl-2">
+                                        <button @click="addOption(card)" class="text-xs text-brand-600 hover:bg-brand-50 px-2 py-1 rounded flex items-center gap-1 transition-colors">
+                                            <i class="ph-bold ph-plus"></i> 添加选项
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- 填空题 -->
+                                <div v-if="card.type === 'fill'" class="bg-slate-50/80 p-4 rounded-lg border border-slate-200 border-dashed">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs font-bold text-slate-500">正确答案</span>
+                                            <span class="text-[10px] text-slate-400">(来自挖空内容)</span>
+                                        </div>
+                                        <!-- 顺序限制开关 -->
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[10px] text-slate-500">限制顺序</span>
+                                            <button @click="card.orderLimit = !card.orderLimit" class="w-8 h-4 bg-slate-200 rounded-full relative transition-colors" :class="{'bg-brand-500': card.orderLimit}">
+                                                <div class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform" :class="{'translate-x-4': card.orderLimit}"></div>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2 min-h-[24px]">
+                                        <span v-for="(ans, i) in card.answer" :key="i" class="px-2 py-1 bg-white border border-slate-200 rounded text-xs text-slate-700 font-mono shadow-sm flex items-center gap-1">
+                                            <span class="text-slate-300 select-none">{{ i + 1 }}.</span> {{ ans }}
+                                            <button v-if="card.status !== 'locked'" @click="removeFillAnswer(card, i)" class="text-slate-300 hover:text-red-500 ml-1"><i class="ph-bold ph-x"></i></button>
+                                        </span>
+                                        <span v-if="card.answer.length === 0" class="text-xs text-slate-400 italic">请在题干中划选文字并点击“设为填空”</span>
+                                    </div>
+                                </div>
+
+                                <!-- 简答题 -->
+                                <div v-if="card.type === 'essay'" class="space-y-3">
+                                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                        <div class="text-xs font-bold text-slate-500 mb-1">参考答案</div>
+                                        <div class="text-sm text-slate-600 outline-none whitespace-pre-wrap" :contenteditable="card.status !== 'locked'">{{ card.reference }}</div>
+                                    </div>
+                                    <!-- 评分标准 -->
+                                    <div class="bg-amber-50 p-3 rounded-lg border border-amber-100">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <div class="text-xs font-bold text-amber-600">评分标准</div>
+                                            <button v-if="card.status !== 'locked'" @click="addCriteria(card)" class="text-[10px] text-amber-600 bg-white border border-amber-200 px-2 py-0.5 rounded hover:bg-amber-100">
+                                                <i class="ph-bold ph-plus"></i> 添加
+                                            </button>
+                                        </div>
+                                        <ul class="space-y-1">
+                                            <li v-for="(crit, idx) in card.criteria" :key="idx" class="flex gap-2 text-xs text-amber-800">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0"></span>
+                                                <div class="flex-1 outline-none border-b border-transparent focus:border-amber-300" :contenteditable="card.status !== 'locked'">{{ crit }}</div>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <!-- 3. 标签属性区 (可折叠) -->
+                                <div class="pt-4 border-t border-slate-100">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex gap-2 text-[10px]">
+                                            <span v-if="card.knowledge" class="bg-slate-100 text-slate-600 px-2 py-1 rounded">知识点: {{ card.knowledge }}</span>
+                                            <span v-if="card.chapter" class="bg-slate-100 text-slate-600 px-2 py-1 rounded">章节: {{ card.chapter }}</span>
+                                        </div>
+                                        <button @click="card.showTags = !card.showTags" class="text-xs text-slate-400 hover:text-brand-600 flex items-center gap-1 transition-colors">
+                                            高级标签 <i class="ph-bold" :class="card.showTags ? 'ph-caret-up' : 'ph-caret-down'"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <div v-if="card.showTags" class="mt-3 grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg animate-fade-in text-xs">
+                                        <div>
+                                            <label class="block text-slate-400 mb-1">考核层级</label>
+                                            <select class="w-full bg-white border border-slate-200 rounded px-2 py-1 text-slate-700">
+                                                <option>识记</option><option>理解</option><option>应用</option><option>分析</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-slate-400 mb-1">应用场景</label>
+                                            <select class="w-full bg-white border border-slate-200 rounded px-2 py-1 text-slate-700">
+                                                <option>日常练习</option><option>期中考试</option><option>期末考试</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-span-2">
+                                            <label class="block text-slate-400 mb-1">自定义标签</label>
+                                            <input type="text" class="w-full bg-white border border-slate-200 rounded px-2 py-1 text-slate-700" placeholder="如：重点, 2024真题...">
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <!-- 底部入库操作栏 -->
+                        <div v-if="card.status !== 'locked' && !card.isStreaming" class="px-6 py-3 border-t border-slate-50 bg-slate-50/50 rounded-b-xl flex justify-between items-center group-hover:bg-slate-100/50 transition-colors">
+                             <div class="text-[10px] text-slate-400 font-mono">ID: {{ card.id }}</div>
+                             <button ref="saveBtn" @click="saveCard(card, $event)" class="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-brand-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm hover:shadow hover:border-brand-200 transition-all active:scale-95">
+                                 <i class="ph-bold ph-download-simple"></i> 入库
+                             </button>
+                        </div>
+                    </div>
+                </transition-group>
+
+                <div class="h-32 flex flex-col items-center justify-center text-slate-300 text-xs gap-2">
+                    <i class="ph-duotone ph-arrow-down text-xl animate-bounce"></i>
+                    <span>试题生成流到底部</span>
+                </div>
+            </div>
+
+            <!-- 挖空悬浮菜单 -->
+            <div v-if="cardTextMenu.show" :style="{ top: cardTextMenu.y + 'px', left: cardTextMenu.x + 'px' }" 
+                 class="fixed z-[70] bg-white border border-slate-200 text-slate-700 rounded-lg shadow-xl py-1 px-1 flex items-center gap-1 float-menu transform -translate-x-1/2 -translate-y-full mt-[-10px]">
+                <button @click="makeCloze" class="flex items-center gap-1.5 px-3 py-1.5 hover:bg-brand-50 hover:text-brand-600 rounded-md text-xs font-bold transition-colors">
+                    <i class="ph-bold ph-brackets-square"></i> 设为填空
+                </button>
+                <div class="w-px h-3 bg-slate-200"></div>
+                <button @click="polishText" class="flex items-center gap-1 px-3 py-1.5 hover:bg-slate-50 rounded-md text-xs font-medium transition-colors">
+                    <i class="ph-bold ph-magic-wand"></i> AI 润色
+                </button>
+            </div>
+        </main>
+
+        <!-- =======================
+             2.3 右栏：AI 副驾驶 (Copilot) - 25%
+             ======================= -->
+        <aside class="w-1/4 min-w-[320px] bg-white border-l border-slate-200 flex flex-col z-10 shadow-[-4px_0_24px_rgba(0,0,0,0.02)]">
+            
+            <!-- 参数配置 (可折叠) -->
+            <div class="border-b border-slate-100">
+                <div @click="isConfigOpen = !isConfigOpen" class="px-5 py-3 flex justify-between items-center cursor-pointer hover:bg-slate-50 select-none bg-slate-50/30">
+                    <span class="text-xs font-bold text-slate-700 flex items-center gap-2">
+                        <i class="ph-bold ph-sliders"></i> 参数配置
+                    </span>
+                    <i class="ph-bold ph-caret-down transition-transform text-slate-400" :class="{'rotate-180': !isConfigOpen}"></i>
+                </div>
+                
+                <div v-show="isConfigOpen" class="px-5 pb-5 space-y-4 pt-2">
+                    <!-- 题型 -->
+                    <div>
+                        <label class="text-[10px] text-slate-400 font-bold uppercase mb-2 block">默认题型</label>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button v-for="t in ['单选', '多选', '填空', '简答']" :key="t" 
+                                    @click="config.type = t"
+                                    class="py-1.5 text-[11px] rounded border transition-all"
+                                    :class="config.type === t ? 'bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-200' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'">
+                                {{ t }}
+                            </button>
+                        </div>
+                    </div>
+                    <!-- 难度 -->
+                    <div>
+                         <label class="text-[10px] text-slate-400 font-bold uppercase mb-2 block">难度系数: {{ getDifficultyLabel() }}</label>
+                         <input type="range" v-model="config.difficulty" min="1" max="3" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-600">
+                         <div class="flex justify-between text-[10px] text-slate-300 mt-1 font-medium">
+                             <span>容易</span><span>困难</span>
+                         </div>
+                    </div>
+                    <!-- 数量 -->
+                    <div>
+                        <label class="text-[10px] text-slate-400 font-bold uppercase mb-2 block">单次生成: {{ config.count }} 题</label>
+                        <div class="flex gap-2">
+                             <button v-for="n in [1, 3, 5]" :key="n" @click="config.count = n"
+                                class="flex-1 py-1 rounded-md border text-xs font-medium transition-colors"
+                                :class="config.count === n ? 'bg-brand-50 border-brand-200 text-brand-600' : 'border-slate-200 text-slate-500 hover:bg-slate-50'">
+                                {{ n }}
+                             </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 对话流 (Chat) -->
+            <div class="flex-1 overflow-y-auto custom-scroll p-4 space-y-4 bg-slate-50/30" ref="chatContainer">
+                <div v-for="(msg, idx) in chatHistory" :key="idx" class="flex gap-3 text-sm animate-fade-in" :class="msg.role === 'user' ? 'flex-row-reverse' : ''">
+                    <div class="w-8 h-8 rounded-full shrink-0 flex items-center justify-center border shadow-sm"
+                         :class="msg.role === 'user' ? 'bg-white border-slate-200' : 'bg-gradient-to-br from-brand-500 to-brand-600 text-white border-transparent'">
+                        <i :class="msg.role === 'user' ? 'ph-bold ph-user' : 'ph-fill ph-sparkle'"></i>
+                    </div>
+                    <div class="max-w-[85%] px-3.5 py-2.5 rounded-2xl leading-relaxed shadow-sm text-xs"
+                         :class="msg.role === 'user' ? 'bg-white border border-slate-200 text-slate-700 rounded-tr-none' : 'bg-brand-50 border border-brand-100 text-slate-700 rounded-tl-none'">
+                        {{ msg.content }}
+                    </div>
+                </div>
+                <!-- 思考状态 -->
+                <div v-if="isAiThinking" class="flex gap-3 animate-pulse">
+                     <div class="w-8 h-8 rounded-full bg-brand-600 text-white flex items-center justify-center shrink-0">
+                        <i class="ph-fill ph-sparkle animate-spin"></i>
+                     </div>
+                     <div class="text-xs text-slate-400 flex items-center h-8">AI 正在思考并解析上下文...</div>
+                </div>
+            </div>
+
+            <!-- 输入区与拖拽 (Input & Drop Zone) -->
+            <div class="p-4 bg-white border-t border-slate-200 relative z-20">
+                <!-- 拖拽遮罩 -->
+                <div @dragenter.prevent="isDragging = true" @dragleave.prevent="isDragging = false" @dragover.prevent @drop.prevent="handleDrop"
+                     class="absolute inset-0 z-30 bg-white/95 border-2 border-dashed border-brand-400 m-2 rounded-xl flex flex-col items-center justify-center text-brand-600 transition-all backdrop-blur-sm"
+                     :class="isDragging ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'">
+                     <div class="w-12 h-12 bg-brand-50 rounded-full flex items-center justify-center mb-2 animate-bounce">
+                        <i class="ph-bold ph-upload-simple text-2xl"></i>
+                     </div>
+                     <span class="text-sm font-bold">释放文件以识别 (OCR)</span>
+                </div>
+
+                <div class="relative">
+                    <textarea v-model="chatInput" @keydown.enter.prevent="sendChat" 
+                              placeholder="输入指令，如：基于左侧文档出3道选择题..." 
+                              class="w-full h-24 bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 resize-none custom-scroll placeholder:text-slate-400 text-slate-700 transition-shadow"></textarea>
+                    
+                    <div class="absolute bottom-3 right-3 flex items-center gap-2">
+                        <button class="p-1.5 text-slate-400 hover:text-brand-600 transition-colors bg-white border border-slate-200 rounded-md shadow-sm" title="上传图片/文档">
+                            <i class="ph-bold ph-image"></i>
+                        </button>
+                        <button @click="sendChat" :disabled="!chatInput.trim()" 
+                                class="bg-brand-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-brand-200">
+                            发送
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- 粒子特效容器 -->
+    <div ref="particlesContainer" class="fixed inset-0 pointer-events-none z-[100]"></div>
+
+</div>
+
+<script>
+    const { createApp, ref, reactive, nextTick, onMounted, onUnmounted, computed } = Vue;
+
+    // 注册 GSAP 插件
+    gsap.registerPlugin(MotionPathPlugin);
+
+    createApp({
+        setup() {
+            // --- State ---
+            const leftTab = ref('doc');
+            const currentNode = ref(null); // 当前锁定的知识点
+            const isConfigOpen = ref(true);
+            const isDragging = ref(false);
+            const isAiThinking = ref(false);
+            const chatInput = ref('');
+            const quickInput = ref('');
+            const quickType = ref('single');
+            const middleColumn = ref(null);
+            const cardRefs = reactive({});
+            const saveBtn = ref(null);
+            const libraryIcon = ref(null);
+            const particlesContainer = ref(null);
+            const isLibraryAnimating = ref(false);
+
+            // 数据
+            const libraryCount = ref(128);
+            const sessionStats = reactive({ generated: 0, pending: 0 });
+            const chatHistory = ref([
+                { role: 'system', content: '👋 你好！我是 AI 助教。在左侧划选文档，我可以基于上下文为您出题。' }
+            ]);
+            const config = reactive({ type: '单选', difficulty: 2, count: 3 });
+            const cards = ref([]);
+            
+            // 知识树 Mock
+            const knowledgeTree = ref([
+                { id: 1, title: '第一章 鸦片战争', expanded: false, children: [] },
+                { id: 2, title: '第二章 太平天国运动', expanded: false, children: [] },
+                { 
+                    id: 3, title: '第三章 洋务运动', expanded: true, 
+                    children: [
+                        { id: 31, title: '洋务运动的背景' },
+                        { id: 32, title: '主要内容与成就' },
+                        { id: 33, title: '失败原因与影响' }
+                    ]
+                }
+            ]);
+
+            // 交互菜单状态
+            const selectionMenu = reactive({ show: false, x: 0, y: 0, text: '', sourceElement: null });
+            const cardTextMenu = reactive({ show: false, x: 0, y: 0, range: null, card: null });
+            const connectionLines = ref([]);
+
+            // --- Methods: Context & RAG ---
+            
+            const toggleNode = (node) => node.expanded = !node.expanded;
+            const lockKnowledge = (node) => {
+                currentNode.value = node;
+                // 自动切换到文档tab并滚动到对应位置 (Mock)
+                leftTab.value = 'doc';
+            };
+
+            const handleTextSelection = () => {
+                const sel = window.getSelection();
+                if (sel.toString().trim().length > 0) {
+                    const range = sel.getRangeAt(0);
+                    const rect = range.getBoundingClientRect();
+                    selectionMenu.show = true;
+                    selectionMenu.x = rect.left + rect.width / 2;
+                    selectionMenu.y = rect.top;
+                    selectionMenu.text = sel.toString();
+                    
+                    // 获取最近的段落ID用于连线
+                    let el = range.startContainer.parentElement;
+                    while(el && !el.id) el = el.parentElement;
+                    selectionMenu.sourceElement = el || range.startContainer.parentElement;
+                } else {
+                    selectionMenu.show = false;
+                }
+            };
+
+            const triggerRagGeneration = async () => {
+                const text = selectionMenu.text;
+                selectionMenu.show = false;
+                
+                // 高亮文档
+                if (selectionMenu.sourceElement) {
+                    selectionMenu.sourceElement.classList.add('highlight-source', 'active-link');
+                }
+                
+                // 填充 Chat
+                const typeStr = config.type;
+                chatInput.value = `基于选中文本：“${text.substring(0, 8)}...” 生成 ${config.count} 道 [${getDifficultyLabel()}] 的 [${typeStr}]。`;
+                await sendChat(true, selectionMenu.sourceElement);
+            };
+
+            // --- Methods: Chat & Logic ---
+
+            const sendChat = async (isRag = false, sourceEl = null) => {
+                const content = chatInput.value;
+                if (!content.trim()) return;
+
+                chatHistory.value.push({ role: 'user', content });
+                chatInput.value = '';
+                isAiThinking.value = true;
+                
+                // 滚动到底部
+                nextTick(() => {
+                    const container = document.querySelector('aside .custom-scroll'); // Right col
+                    if(container) container.scrollTop = container.scrollHeight;
+                });
+
+                // Simulate AI
+                setTimeout(async () => {
+                    isAiThinking.value = false;
+                    const newCards = [];
+                    // 使用配置的类型，或者从 Chat 内容中推断（这里简化为配置）
+                    const targetType = getTypeFromConfig();
+
+                    for(let i=0; i < config.count; i++) {
+                        const id = Date.now() + i;
+                        newCards.push(createCardData(id, targetType, sourceEl));
+                    }
+                    cards.value.push(...newCards);
+                    
+                    await nextTick();
+                    const feed = document.getElementById('card-feed');
+                    if(feed) feed.scrollTop = feed.scrollHeight;
+
+                    // Stream Animation
+                    streamFillCards(newCards);
+
+                }, 1000);
+            };
+
+            const createCardData = (id, type, sourceEl = null) => {
+                return {
+                    id,
+                    type,
+                    difficulty: getDifficultyLabel(),
+                    content: '', // 初始为空，流式填充
+                    options: type === 'single' || type === 'multi' ? [] : null, 
+                    answer: [],
+                    reference: type === 'essay' ? '参考答案...' : '',
+                    criteria: type === 'essay' ? ['要点准确 (2分)', '逻辑清晰 (3分)'] : null,
+                    orderLimit: false, // 填空特有
+                    status: 'generated',
+                    isStreaming: true,
+                    knowledge: currentNode.value ? currentNode.value.title : '',
+                    chapter: currentNode.value ? '第三章' : '',
+                    showTags: false,
+                    sourceElement: sourceEl,
+                    ocr: false
+                };
+            };
+
+            const streamFillCards = (targetCards) => {
+                let step = 0;
+                const interval = setInterval(() => {
+                    step++;
+                    targetCards.forEach((card, idx) => {
+                        // 错峰显示
+                        if (step * (idx + 1) > 20 && card.isStreaming) {
+                            card.isStreaming = false;
+                            // Fill Mock Content
+                            const mock = generateMockData(card.type, idx);
+                            card.content = mock.content;
+                            if(card.options) card.options = mock.options;
+                            if(card.type === 'fill') card.answer = []; // 填空题初始无答案，需挖空
+                            else card.answer = mock.answer;
+                            if(card.type === 'essay') card.reference = mock.reference;
+
+                            sessionStats.generated++;
+                            sessionStats.pending++;
+
+                            // Create Link
+                            if (card.sourceElement) {
+                                createConnection(card.sourceElement, card.id);
+                            }
+                        }
+                    });
+                    if (targetCards.every(c => !c.isStreaming)) clearInterval(interval);
+                }, 100);
+            };
+
+            // --- Methods: Canvas Interactions ---
+
+            const handleCardTextSelect = (e, card) => {
+                if (card.status === 'locked') return;
+                const sel = window.getSelection();
+                if (sel.toString().trim().length > 0 && sel.anchorNode.parentElement.isContentEditable) {
+                    const range = sel.getRangeAt(0);
+                    const rect = range.getBoundingClientRect();
+                    cardTextMenu.show = true;
+                    cardTextMenu.x = rect.left + rect.width / 2;
+                    cardTextMenu.y = rect.top;
+                    cardTextMenu.range = range;
+                    cardTextMenu.card = card;
+                } else {
+                    cardTextMenu.show = false;
+                }
+            };
+
+            const makeCloze = () => {
+                const { card, range } = cardTextMenu;
+                if (!card) return;
+                
+                // 如果不是填空题，询问或自动转换？这里简化为强制转或提示
+                if (card.type !== 'fill') {
+                    if(confirm('是否将此题转换为填空题？')) {
+                        card.type = 'fill';
+                        card.options = null;
+                        card.answer = [];
+                    } else {
+                        cardTextMenu.show = false;
+                        return;
+                    }
+                }
+                
+                const selectedText = range.toString();
+                // DOM 替换
+                const span = document.createElement('span');
+                span.className = 'border-b-2 border-brand-500 text-transparent min-w-[40px] inline-block mx-1 select-none bg-brand-50/50';
+                span.innerText = '____';
+                range.deleteContents();
+                range.insertNode(span);
+
+                // Add to answer
+                card.answer.push(selectedText);
+                cardTextMenu.show = false;
+            };
+
+            const polishText = () => {
+                alert('✨ AI 正在优化文案表达...');
+                cardTextMenu.show = false;
+            };
+
+            const addManualCard = () => {
+                const id = Date.now();
+                const card = createCardData(id, quickType.value);
+                card.isStreaming = false; // 手动不需要流式
+                card.status = 'generated';
+                
+                // 如果输入为空，生成空白模板
+                if (!quickInput.value.trim()) {
+                    card.content = '请输入题目内容...';
+                    if (card.options) {
+                        card.options = [{label:'A', text:'选项A'}, {label:'B', text:'选项B'}];
+                    }
+                } else {
+                    card.content = quickInput.value;
+                    // Mock options for manual input
+                    if (card.options) {
+                        card.options = [{label:'A', text:'选项...'}, {label:'B', text:'选项...'}];
+                    }
+                }
+                
+                cards.value.unshift(card); // Add to top
+                quickInput.value = '';
+                sessionStats.generated++;
+                sessionStats.pending++;
+            };
+
+            // --- Methods: Card Operations ---
+
+            const toggleOption = (card, label) => {
+                if (card.type === 'single') card.answer = [label];
+                else {
+                    const idx = card.answer.indexOf(label);
+                    if (idx > -1) card.answer.splice(idx, 1);
+                    else card.answer.push(label);
+                }
+            };
+            const addOption = (card) => {
+                const labels = 'ABCDEFGHI';
+                if(card.options.length < labels.length) {
+                    card.options.push({ label: labels[card.options.length], text: '新选项' });
+                }
+            };
+            const removeOption = (card, idx) => {
+                card.options.splice(idx, 1);
+                const labels = 'ABCDEFGHI';
+                card.options.forEach((o, i) => o.label = labels[i]);
+            };
+            const removeFillAnswer = (card, idx) => card.answer.splice(idx, 1);
+            const addCriteria = (card) => card.criteria.push('新评分标准 (1分)');
+
+            const deleteCard = (id) => {
+                const idx = cards.value.findIndex(c => c.id === id);
+                if(idx > -1) {
+                    // GSAP Slide out
+                    const el = cardRefs[id];
+                    gsap.to(el, {
+                        x: -100, opacity: 0, duration: 0.3,
+                        onComplete: () => {
+                            cards.value.splice(idx, 1);
+                            sessionStats.pending--; // Simplified logic
+                            connectionLines.value = connectionLines.value.filter(l => l.targetId !== id);
+                        }
+                    });
+                }
+            };
+
+            const regenerateVariant = (card) => {
+                chatInput.value = `基于题目 ID:${card.id} 生成一道变式题。`;
+                sendChat();
+            };
+
+            // --- Methods: Save & Animation ---
+
+            const saveCard = (card, event) => {
+                if (card.status === 'locked') return;
+                
+                card.status = 'locked';
+                sessionStats.pending--;
+
+                // Particle Animation
+                const btnRect = event.target.getBoundingClientRect();
+                const destRect = libraryIcon.value.getBoundingClientRect();
+
+                const particle = document.createElement('div');
+                particle.className = 'fixed w-3 h-3 bg-brand-600 rounded-full z-[100] pointer-events-none shadow-sm';
+                particle.style.left = btnRect.left + 'px';
+                particle.style.top = btnRect.top + 'px';
+                particlesContainer.value.appendChild(particle);
+
+                gsap.to(particle, {
+                    duration: 0.6,
+                    motionPath: {
+                        path: [
+                            { x: (destRect.left - btnRect.left) * 0.5, y: -150 },
+                            { x: destRect.left - btnRect.left + 10, y: destRect.top - btnRect.top + 10 }
+                        ],
+                        curviness: 2
+                    },
+                    scale: 0.5,
+                    ease: "power2.in",
+                    onComplete: () => {
+                        particle.remove();
+                        libraryCount.value++;
+                        isLibraryAnimating.value = true;
+                        setTimeout(() => isLibraryAnimating.value = false, 300);
+                    }
+                });
+            };
+
+            const saveAllCards = () => {
+                const pending = cards.value.filter(c => c.status !== 'locked');
+                pending.forEach((card, i) => {
+                    setTimeout(() => {
+                        const el = cardRefs[card.id];
+                        if (el) {
+                            const btn = el.querySelector('button'); // simplistic selector
+                            const rect = btn ? btn.getBoundingClientRect() : el.getBoundingClientRect();
+                            const fakeEvent = { target: { getBoundingClientRect: () => rect } };
+                            saveCard(card, fakeEvent);
+                        }
+                    }, i * 150); // Staggered
+                });
+            };
+
+            // --- Methods: OCR Drag Drop ---
+            
+            const handleDrop = (e) => {
+                isDragging.value = false;
+                const files = e.dataTransfer.files;
+                if(files.length > 0) {
+                    chatHistory.value.push({ role: 'user', content: `📄 [文件上传] ${files[0].name}` });
+                    chatHistory.value.push({ role: 'system', content: '正在进行 OCR 识别与解析...' });
+                    isAiThinking.value = true;
+                    
+                    setTimeout(() => {
+                        isAiThinking.value = false;
+                        const id = Date.now();
+                        const card = createCardData(id, 'single');
+                        card.isStreaming = false;
+                        card.content = '图中展示了二叉树的哪种遍历方式？';
+                        card.options = [{label:'A', text:'前序'}, {label:'B', text:'中序'}, {label:'C', text:'后序'}];
+                        card.ocr = true; // Badge
+                        cards.value.unshift(card);
+                        sessionStats.generated++;
+                        sessionStats.pending++;
+                        chatHistory.value.push({ role: 'system', content: '✅ 识别成功，已生成试题卡片。' });
+                    }, 1500);
+                }
+            };
+
+            // --- Methods: Connections ---
+            
+            const createConnection = (sourceEl, cardId) => {
+                connectionLines.value.push({ id: `conn-${cardId}`, source: sourceEl, targetId: cardId, d: '' });
+                updateConnectionLines();
+            };
+
+            const updateConnectionLines = () => {
+                connectionLines.value.forEach(line => {
+                    const el = cardRefs[line.targetId];
+                    if (!el || !line.source) return;
+
+                    const srcRect = line.source.getBoundingClientRect();
+                    const tgtRect = el.getBoundingClientRect();
+
+                    // Visibility check
+                    if (tgtRect.top > window.innerHeight || tgtRect.bottom < 0 || srcRect.top > window.innerHeight || srcRect.bottom < 0) {
+                        line.d = ''; return;
+                    }
+
+                    const startX = srcRect.right;
+                    const startY = srcRect.top + srcRect.height/2;
+                    const endX = tgtRect.left;
+                    const endY = tgtRect.top + 40;
+
+                    const cp1X = startX + 80;
+                    const cp2X = endX - 80;
+
+                    line.d = `M ${startX} ${startY} C ${cp1X} ${startY}, ${cp2X} ${endY}, ${endX} ${endY}`;
+                });
+            };
+
+            // --- Helpers ---
+            const getTypeFromConfig = () => {
+                const map = { '单选':'single', '多选':'multi', '填空':'fill', '简答':'essay' };
+                return map[config.type] || 'single';
+            };
+            const getDifficultyLabel = () => ['容易', '中等', '困难'][config.difficulty-1];
+            const getTypeName = (t) => ({'single':'单选题','multi':'多选题','fill':'填空题','essay':'简答题'}[t]);
+            const getTypeBadgeClass = (t) => ({
+                'single': 'bg-blue-50 text-blue-600 border-blue-100',
+                'multi': 'bg-purple-50 text-purple-600 border-purple-100',
+                'fill': 'bg-orange-50 text-orange-600 border-orange-100',
+                'essay': 'bg-amber-50 text-amber-600 border-amber-100'
+            }[t]);
+            const getLevelColor = (l) => ({'容易':'bg-green-500', '中等':'bg-blue-500', '困难':'bg-red-500'}[l] || 'bg-slate-400');
+            
+            const generateMockData = (type, seed) => {
+                const content = seed % 2 === 0 ? '洋务运动失败的根本原因在于？' : '下列属于洋务派创办的民用工业的是？';
+                if (type === 'fill') return { content: '洋务运动前期的口号是____，后期的口号是____。', answer: ['自强', '求富'] };
+                if (type === 'essay') return { content: '简述洋务运动的历史意义。', reference: '1. 引进了西方先进技术...\n2. 培养了近代人才...\n3. 刺激了民族资本主义产生...' };
+                return {
+                    content,
+                    options: [{label:'A', text:'中学为体，西学为用'}, {label:'B', text:'外国势力破坏'}, {label:'C', text:'顽固派阻挠'}],
+                    answer: ['A']
+                };
+            };
+
+            // [关键修复] 返回函数
+            const goBack = () => {
+                window.location.href = '1.智能试题库管理new.html';
+            };
+
+            // Lifecycle
+            onMounted(() => {
+                setInterval(updateConnectionLines, 50); // 持续更新连线
+                window.addEventListener('resize', updateConnectionLines);
+            });
+            onUnmounted(() => window.removeEventListener('resize', updateConnectionLines));
+
+            return {
+                leftTab, currentNode, isConfigOpen, isDragging, isAiThinking, chatInput, quickInput, quickType,
+                middleColumn, cardRefs, saveBtn, libraryIcon, particlesContainer, isLibraryAnimating,
+                libraryCount, sessionStats, chatHistory, config, cards, knowledgeTree,
+                selectionMenu, cardTextMenu, connectionLines,
+                toggleNode, lockKnowledge, handleTextSelection, triggerRagGeneration,
+                sendChat, handleCardTextSelect, makeCloze, polishText,
+                toggleOption, addOption, removeOption, removeFillAnswer, addCriteria,
+                addManualCard, deleteCard, regenerateVariant, saveCard, saveAllCards, handleDrop,
+                getTypeName, getTypeBadgeClass, getLevelColor, getDifficultyLabel,
+                goBack // [关键修复] 导出 goBack
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
