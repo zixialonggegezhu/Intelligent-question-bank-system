@@ -39,8 +39,8 @@
     <!-- 3. Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
-    <!-- 4. Vue 3 (国内稳定源) -->
-    <script src="https://cdn.staticfile.org/vue/3.3.4/vue.global.prod.min.js"></script>
+    <!-- 4. Vue 3 (使用稳定源修复白屏问题) -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 
     <style>
         body { background-color: #f8fafc; }
@@ -113,8 +113,13 @@
                     <span class="font-semibold text-slate-800">试题库</span>
                 </nav>
                 <div class="flex items-center gap-4">
+                    
+                    <!-- 【新增】去组卷按钮 -->
+                    <button @click="goToPaperBank" class="flex items-center gap-2 bg-white text-slate-600 border border-slate-200 hover:border-brand-500 hover:text-brand-600 px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-all duration-300 transform active:scale-95 mr-2">
+                        <i class="ph-bold ph-scroll"></i> 去组卷
+                    </button>
+
                     <div class="relative group">
-                        <!-- 优化：跳转至工作台 -->
                         <button @click="triggerAiWorkbench" class="flex items-center gap-2 bg-gradient-to-r from-brand-600 to-indigo-500 hover:from-brand-700 hover:to-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg shadow-brand-500/20 transition-all duration-300 transform group-hover:-translate-y-0.5 active:scale-95">
                             <i class="ph-fill ph-sparkle text-yellow-300"></i> AI 智能出题
                         </button>
@@ -280,6 +285,7 @@
                         </div>
 
                         <div class="mt-auto pt-3 border-t border-slate-50 flex flex-col gap-2">
+                            <!-- 优化点3: 点击知识点联动筛选 -->
                             <div @click.stop="applyKpFilter(q)" class="flex items-center gap-1.5 text-xs text-brand-700 bg-brand-50 px-2 py-1.5 rounded-md w-fit border border-brand-100/50 cursor-pointer hover:bg-brand-100 transition-colors" title="点击只筛选此知识点">
                                 <i class="ph-fill ph-brain text-brand-500"></i>{{ q.kpName }}
                             </div>
@@ -328,6 +334,7 @@
                         <div class="flex-1 min-w-0 flex flex-col gap-1 cursor-pointer" @click="openDetail(q)">
                             <p class="text-sm text-slate-700 truncate font-medium group-hover:text-brand-600" v-html="q.content"></p>
                             <div class="flex items-center gap-2 text-xs">
+                                <!-- 优化点3: 点击知识点联动筛选 -->
                                 <span @click.stop="applyKpFilter(q)" class="text-brand-600 bg-brand-50 px-1.5 rounded cursor-pointer hover:bg-brand-100 hover:underline" title="点击只筛选此知识点">
                                     <i class="ph-fill ph-brain text-[10px]"></i> {{ q.kpName }}
                                 </span>
@@ -394,6 +401,7 @@
                             <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-4">
                                 <span class="text-xs font-bold text-slate-500 uppercase block mb-2">参考答案</span>
                                 <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{{ detailModal.data.answer }}</p>
+                                <!-- 优化点1: 填空题显示是否限制顺序 -->
                                 <div v-if="detailModal.data.type === 'fill' && detailModal.data.orderLimit" class="mt-3 pt-3 border-t border-slate-200 flex items-center gap-2">
                                     <span class="text-xs font-bold text-slate-400">限制答案顺序:</span>
                                     <span class="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
@@ -415,7 +423,7 @@
                             <p class="text-sm text-slate-600 leading-relaxed">{{ detailModal.data.analysis }}</p>
                         </div>
                     </div>
-                    <!-- 修复：详情页底部信息，增加“所属章节” -->
+                    <!-- 详情页底部信息 -->
                     <div class="bg-slate-50 px-8 py-4 border-t border-slate-200 grid grid-cols-4 gap-4 text-xs">
                         <div><span class="text-slate-400 block mb-1">关联知识点</span><span class="font-medium text-brand-600">{{ detailModal.data.kpName }}</span></div>
                         <div><span class="text-slate-400 block mb-1">所属章节</span><span class="font-medium text-slate-700">{{ detailModal.data.chapterName }}</span></div>
@@ -459,6 +467,7 @@
             setup() {
                 // --- State ---
                 const viewMode = ref('grid');
+                // 优化: kp 初始值改为数组 []
                 const filters = ref({ chapter: '', kp: [], type: '', level: '', search: '' });
                 const currentSort = ref('newest'); // 新增：当前排序规则
                 const detailModal = ref({ show: false, data: {} });
@@ -855,6 +864,14 @@
                     }, 800);
                 };
 
+                // 【新增】去组卷跳转逻辑
+                const goToPaperBank = () => {
+                    showToast('正在前往智能卷库...');
+                    setTimeout(() => {
+                        window.open('paperbank', '_blank');
+                    }, 500);
+                };
+
                 const handleClickOutside = (e) => {
                     if (kpDropdownRef.value && !kpDropdownRef.value.contains(e.target)) {
                         isKpDropdownOpen.value = false;
@@ -889,7 +906,8 @@
                     typeOptions, levelOptions,
                     toggleKp, getCount, openDetail, toggleSelect, toggleSelectAll, confirmDeleteSingle, openDeleteModal, executeDelete, 
                     handleBulkExport, generateQuiz, showToast, triggerAiWorkbench, applyKpFilter,
-                    getTypeName, getTypeBadgeClass, getLevelName, getLevelDotColor, getLevelTextColor, getOrderLimitLabel
+                    getTypeName, getTypeBadgeClass, getLevelName, getLevelDotColor, getLevelTextColor, getOrderLimitLabel,
+                    goToPaperBank // 【新增】导出跳转函数
                 };
             }
         }).mount('#app');
