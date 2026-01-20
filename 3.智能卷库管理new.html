@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>卷库管理 | 国家数字大学智慧学习平台</title>
+    
+    <!-- 核心依赖 (保持国内稳定源) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.staticfile.org/vue/3.3.4/vue.global.prod.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc', 400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 800: '#3730a3', 900: '#312e81' }
+                    },
+                    animation: { 'slide-up': 'slideUp 0.3s ease-out' },
+                    keyframes: { slideUp: { '0%': { transform: 'translateY(10px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } } }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { background-color: #f8fafc; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        [v-cloak] { display: none !important; }
+        
+        .draggable-source { cursor: grab; }
+        .draggable-source:active { cursor: grabbing; }
+        .drop-zone { transition: all 0.2s; }
+        .drop-zone.drag-over { background-color: #eef2ff; border-color: #6366f1; border-style: dashed; }
+        .section-active { border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1); }
+        .custom-select-dropdown { max-height: 300px; overflow-y: auto; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+    </style>
+</head>
+<body class="text-slate-600 antialiased h-screen flex overflow-hidden">
+
+<div id="app" class="flex w-full h-full relative" v-cloak @click="closeDropdowns">
+
+    <!-- 左侧导航栏 -->
+    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 z-20 shadow-sm">
+        <div class="h-16 flex items-center px-5 border-b border-slate-50">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-600 to-brand-500 flex items-center justify-center text-white mr-3 shadow-md">
+                <i class="ph-bold ph-graduation-cap text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-slate-800 text-sm tracking-tight">国家数字大学</h1>
+                <p class="text-[10px] text-slate-400 font-medium">智慧学习平台 v2.1</p>
+            </div>
+        </div>
+        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+            <div class="px-5 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">教学管理</div>
+            <a href="#" class="flex items-center px-5 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors border-r-4 border-transparent">
+                <i class="ph ph-squares-four text-lg mr-3"></i> 课程概览
+            </a>
+            <div class="px-5 pb-2 pt-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">资源中心</div>
+            <a href="1.智能试题库管理new.html" class="flex items-center px-5 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors border-r-4 border-transparent">
+                <i class="ph ph-files text-lg mr-3"></i> 试题库管理
+            </a>
+            <a href="#" class="nav-active bg-brand-50 text-brand-600 border-r-4 border-brand-600 flex items-center px-5 py-3 text-sm font-medium transition-colors">
+                <i class="ph-fill ph-scroll text-lg mr-3"></i> 卷库管理
+            </a>
+            <a href="#" class="flex items-center px-5 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors border-r-4 border-transparent">
+                <i class="ph ph-book-open text-lg mr-3"></i> 教材管理
+            </a>
+        </nav>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 flex flex-col h-full bg-[#f8fafc] relative min-w-0">
+        <!-- Header -->
+        <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-30">
+            <nav class="flex items-center text-sm text-slate-500">
+                <span class="hover:text-brand-600 cursor-pointer">资源库</span>
+                <i class="ph ph-caret-right mx-2 text-xs text-slate-300"></i>
+                <span class="font-semibold text-slate-800">卷库管理</span>
+                <span v-if="viewMode === 'editor'" class="flex items-center">
+                    <i class="ph ph-caret-right mx-2 text-xs text-slate-300"></i>
+                    <span class="text-slate-500">{{ currentExam.title || '未命名试卷' }}</span>
+                </span>
+            </nav>
+            <div class="flex items-center gap-4">
+                <template v-if="viewMode === 'list'">
+                    <button @click="createNewExam" class="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-md shadow-brand-500/20 transition-all">
+                        <i class="ph-bold ph-plus"></i> 新建试卷
+                    </button>
+                </template>
+                <template v-else>
+                     <button @click="viewMode = 'list'" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-50 font-medium">返回列表</button>
+                     <div class="h-4 w-px bg-slate-200"></div>
+                     <button @click="saveExam('draft')" class="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-sm hover:bg-slate-50 font-medium">保存草稿</button>
+                     <button @click="saveExam('published')" class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm hover:bg-brand-700 shadow-md font-medium flex items-center gap-2">
+                        <i class="ph-bold ph-paper-plane-tilt"></i> 发布试卷
+                     </button>
+                </template>
+            </div>
+        </header>
+
+        <!-- VIEW A: 试卷列表 (List) -->
+        <div v-if="viewMode === 'list'" class="flex-1 flex flex-col overflow-hidden animate-slide-up">
+            <div class="px-6 py-4 z-20 sticky top-0 bg-[#f8fafc]/95 backdrop-blur-sm">
+                <div class="flex items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="relative group">
+                            <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input v-model="filters.search" type="text" placeholder="搜索试卷名称..." class="pl-10 pr-4 py-2 w-64 bg-white border border-slate-200 rounded-lg text-sm focus:border-brand-500 outline-none shadow-sm">
+                        </div>
+                        <select v-model="filters.status" class="bg-white border border-slate-200 text-slate-600 text-sm rounded-lg px-3 py-2 outline-none cursor-pointer">
+                            <option value="">所有状态</option>
+                            <option value="published">已发布</option>
+                            <option value="draft">草稿</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-400">排序：</span>
+                        <div class="flex bg-white rounded-lg border border-slate-200 p-0.5 shadow-sm">
+                            <button @click="sortKey = 'time'" :class="sortKey === 'time' ? 'bg-slate-100 text-brand-600 font-medium' : 'text-slate-500'" class="px-3 py-1 text-xs rounded">最新</button>
+                            <button @click="sortKey = 'score'" :class="sortKey === 'score' ? 'bg-slate-100 text-brand-600 font-medium' : 'text-slate-500'" class="px-3 py-1 text-xs rounded">总分</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-6 pb-10">
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                    <div @click="createNewExam" class="bg-white/50 rounded-xl border-2 border-dashed border-slate-300 p-5 flex flex-col items-center justify-center cursor-pointer hover:border-brand-500 hover:bg-brand-50/10 transition-all text-slate-400 hover:text-brand-600 min-h-[220px] group">
+                        <div class="w-12 h-12 rounded-full bg-slate-100 group-hover:bg-brand-100 flex items-center justify-center mb-3 transition-colors">
+                            <i class="ph-bold ph-plus text-xl"></i>
+                        </div>
+                        <span class="text-sm font-medium">创建新试卷</span>
+                    </div>
+
+                    <div v-for="exam in filteredExams" :key="exam.id" 
+                         class="bg-white rounded-xl border border-slate-200 p-5 hover:border-brand-300 hover:shadow-lg transition-all group flex flex-col relative">
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <h3 class="font-bold text-slate-800 text-base mb-1 group-hover:text-brand-600 transition-colors line-clamp-1" :title="exam.title">{{ exam.title }}</h3>
+                                <div class="flex items-center gap-2 text-xs">
+                                    <span :class="exam.status === 'published' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-amber-50 text-amber-600 border-amber-100'" class="px-2 py-0.5 rounded border">
+                                        {{ exam.status === 'published' ? '已发布' : '草稿' }}
+                                    </span>
+                                    <span class="text-slate-400">{{ exam.createTime }}</span>
+                                </div>
+                            </div>
+                            <button @click.stop="previewExam(exam)" class="w-8 h-8 rounded-lg bg-slate-50 hover:bg-brand-50 hover:text-brand-600 text-slate-400 flex items-center justify-center transition-colors" title="预览试卷">
+                                <i class="ph-bold ph-eye text-lg"></i>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 py-4 border-t border-b border-slate-50 my-2">
+                            <div class="text-center">
+                                <div class="text-xl font-bold text-slate-700 font-mono">{{ exam.totalScore }}</div>
+                                <div class="text-[10px] text-slate-400 uppercase">总分</div>
+                            </div>
+                            <div class="text-center border-l border-slate-100">
+                                <div class="text-xl font-bold text-slate-700 font-mono">{{ exam.questionCount }}</div>
+                                <div class="text-[10px] text-slate-400 uppercase">题量</div>
+                            </div>
+                            <div class="text-center border-l border-slate-100">
+                                <div class="text-base font-bold text-slate-700 pt-1">{{ exam.duration }}m</div>
+                                <div class="text-[10px] text-slate-400 uppercase">时长</div>
+                            </div>
+                        </div>
+                        <div class="mt-auto pt-2 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button @click="editExam(exam)" class="px-3 py-1.5 text-slate-600 hover:text-brand-600 hover:bg-brand-50 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors border border-transparent hover:border-brand-100">
+                                <i class="ph-bold ph-pencil-simple"></i> 编辑
+                            </button>
+                            <button @click="deleteExam(exam.id)" class="px-3 py-1.5 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors border border-transparent hover:border-red-100">
+                                <i class="ph-bold ph-trash"></i> 删除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW B: 试卷编辑器 (Editor) -->
+        <div v-else class="flex-1 flex overflow-hidden">
+            <!-- Canvas -->
+            <div class="flex-1 bg-slate-100 overflow-y-auto custom-scroll p-6">
+                <div class="max-w-4xl mx-auto min-h-full flex flex-col gap-6">
+                    <!-- Paper Info -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                         <input v-model="currentExam.title" type="text" class="w-full text-2xl font-bold text-center text-slate-800 placeholder:text-slate-300 outline-none border-b-2 border-transparent focus:border-brand-300 transition-colors pb-2 mb-4" placeholder="请输入试卷标题...">
+                         <div class="flex justify-center gap-6 text-sm text-slate-500">
+                             <div class="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg"><span>建议时长:</span><input v-model="currentExam.duration" type="number" class="w-12 bg-transparent text-center font-bold text-slate-700 outline-none border-b border-slate-300 focus:border-brand-500"><span>分钟</span></div>
+                             <div class="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg"><span>难度:</span><select v-model="currentExam.difficulty" class="bg-transparent font-bold text-slate-700 outline-none cursor-pointer"><option value="easy">0.8 (简单)</option><option value="normal">0.6 (中等)</option><option value="hard">0.4 (困难)</option></select></div>
+                             <div class="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg w-64"><span>说明:</span><input v-model="currentExam.description" type="text" class="bg-transparent flex-1 text-slate-700 outline-none placeholder:text-slate-400" placeholder="考试注意事项..."></div>
+                         </div>
+                    </div>
+
+                    <!-- Sections -->
+                    <div v-for="(section, sIdx) in currentExam.sections" :key="section.id" 
+                         @click="activeSectionId = section.id"
+                         @dragover.prevent="handleDragOver" @drop="handleDrop($event, sIdx)"
+                         class="bg-white rounded-xl border-2 shadow-sm overflow-hidden transition-all drop-zone"
+                         :class="activeSectionId === section.id ? 'section-active' : 'border-slate-200'">
+                        
+                        <div class="bg-slate-50/80 border-b border-slate-100 px-5 py-3 flex items-center justify-between group">
+                            <div class="flex items-center gap-3 flex-1">
+                                <div class="w-6 text-center text-slate-400 font-bold select-none text-lg border-r border-slate-200 pr-2">{{ sIdx + 1 }}</div>
+                                <div class="flex items-baseline gap-2 flex-1">
+                                    <input v-model="section.title" class="font-bold text-slate-700 bg-transparent outline-none focus:bg-white px-1 rounded hover:bg-slate-100 focus:ring-1 ring-brand-200 transition-colors w-40" placeholder="大题标题">
+                                    <span class="text-xs text-slate-400">
+                                        (共 <span class="font-mono text-slate-600">{{ section.questions.length }}</span> 题，每题 
+                                        <input v-model.number="section.scorePerQ" type="number" class="w-10 text-center bg-white border border-slate-200 rounded px-1 py-0.5 text-xs font-bold text-slate-700 focus:border-brand-500 outline-none"> 
+                                        分，共 <span class="font-bold text-brand-600">{{ section.questions.length * section.scorePerQ }}</span> 分)
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <button @click.stop="moveSection(sIdx, -1)" class="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded" title="上移大题" :disabled="sIdx === 0"><i class="ph-bold ph-caret-up"></i></button>
+                                <button @click.stop="moveSection(sIdx, 1)" class="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded" title="下移大题" :disabled="sIdx === currentExam.sections.length - 1"><i class="ph-bold ph-caret-down"></i></button>
+                                <div class="w-px h-4 bg-slate-200 mx-1"></div>
+                                <button @click.stop="removeSection(sIdx)" class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded" title="删除大题"><i class="ph-bold ph-trash"></i></button>
+                            </div>
+                        </div>
+
+                        <div class="min-h-[100px] relative">
+                            <div v-if="section.questions.length === 0" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 pointer-events-none">
+                                <i class="ph-duotone ph-download-simple text-3xl mb-2 opacity-50"></i>
+                                <p class="text-xs">点击右侧“添加”或拖拽试题到此处</p>
+                            </div>
+                            <div v-else class="divide-y divide-slate-50">
+                                <div v-for="(q, qIdx) in section.questions" :key="q.id" class="p-4 hover:bg-slate-50 flex gap-4 group/q relative transition-colors items-start">
+                                    <div class="text-slate-400 text-xs font-mono w-6 shrink-0 pt-1 text-right">{{ qIdx + 1 }}.</div>
+                                    <div class="flex-1">
+                                        <div class="text-sm text-slate-700 mb-2 font-medium leading-relaxed" v-html="q.content"></div>
+                                        <div v-if="['single','multi'].includes(q.type)" class="grid grid-cols-2 gap-x-4 gap-y-1 mb-2">
+                                            <div v-for="opt in q.options" :key="opt.label" class="text-xs text-slate-500 flex gap-2">
+                                                <span class="w-4 h-4 rounded-full border flex items-center justify-center text-[10px] shrink-0" :class="q.answer.includes(opt.label) ? 'bg-green-100 text-green-700 border-green-200 font-bold' : 'border-slate-200'">{{ opt.label }}</span><span class="truncate">{{ opt.content }}</span>
+                                            </div>
+                                        </div>
+                                        <div v-if="q.type === 'judge'" class="flex gap-4 mb-2">
+                                            <div class="text-xs flex items-center gap-1" :class="q.answer.includes('A') ? 'text-green-600 font-bold' : 'text-slate-400'"><i :class="q.answer.includes('A') ? 'ph-fill ph-check-circle' : 'ph-bold ph-circle'"></i> 正确</div>
+                                            <div class="text-xs flex items-center gap-1" :class="q.answer.includes('B') ? 'text-green-600 font-bold' : 'text-slate-400'"><i :class="q.answer.includes('B') ? 'ph-fill ph-check-circle' : 'ph-bold ph-circle'"></i> 错误</div>
+                                        </div>
+                                        <div class="flex items-center gap-4 text-[10px] text-slate-400 bg-slate-100/50 px-2 py-1 rounded w-fit">
+                                            <span>{{ getTypeName(q.type) }}</span><span>{{ getLevelName(q.level) }}</span><span class="text-brand-600">ID: {{ q.id }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-1 opacity-0 group-hover/q:opacity-100 transition-opacity self-start">
+                                        <button @click="openEditQuestionModal(sIdx, qIdx)" class="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded" title="编辑"><i class="ph-bold ph-pencil-simple"></i></button>
+                                        <button @click="moveQuestion(sIdx, qIdx, -1)" class="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded" :disabled="qIdx===0"><i class="ph-bold ph-caret-up"></i></button>
+                                        <button @click="moveQuestion(sIdx, qIdx, 1)" class="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded" :disabled="qIdx===section.questions.length-1"><i class="ph-bold ph-caret-down"></i></button>
+                                        <button @click="removeQuestion(sIdx, qIdx)" class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"><i class="ph-bold ph-x"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button @click="addSection" class="py-4 border-2 border-dashed border-slate-300 rounded-xl text-slate-400 hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50/20 transition-all font-medium flex items-center justify-center gap-2 mb-20"><i class="ph-bold ph-plus-circle text-lg"></i> 添加新大题</button>
+                </div>
+            </div>
+
+            <!-- Right Panel -->
+            <div class="w-96 bg-white border-l border-slate-200 flex flex-col z-20 shadow-[-4px_0_15px_rgba(0,0,0,0.02)]">
+                <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h3 class="font-bold text-slate-700 text-sm flex items-center gap-2"><i class="ph-fill ph-stack text-brand-600"></i> 试题库</h3>
+                    <div class="text-xs text-slate-400">已选 <span class="font-bold text-brand-600">{{ totalStats.count }}</span> 题</div>
+                </div>
+                <div class="p-3 space-y-2 border-b border-slate-100 bg-white relative z-50">
+                    <div class="relative">
+                        <i class="ph ph-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input v-model="pickerFilters.search" type="text" placeholder="搜索题干..." class="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:border-brand-500 outline-none">
+                    </div>
+                    <div class="flex gap-2">
+                        <select v-model="pickerFilters.type" class="flex-1 bg-white border border-slate-200 rounded px-2 py-1.5 text-xs text-slate-600 outline-none cursor-pointer">
+                            <option value="">所有题型</option><option value="single">单选</option><option value="multi">多选</option><option value="judge">判断</option><option value="fill">填空</option><option value="essay">简答</option>
+                        </select>
+                        <select v-model="pickerFilters.level" class="flex-1 bg-white border border-slate-200 rounded px-2 py-1.5 text-xs text-slate-600 outline-none cursor-pointer">
+                            <option value="">所有难度</option><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option>
+                        </select>
+                    </div>
+                    <!-- 优化：自定义多选下拉框 (Tree & Search) -->
+                    <div class="flex gap-2 relative">
+                        <!-- 知识点 (带一键清空) -->
+                        <div class="flex-1 relative" @click.stop="toggleDropdown('kp')">
+                            <div class="w-full bg-white border border-slate-200 rounded px-2 py-1.5 text-xs text-slate-600 cursor-pointer flex justify-between items-center truncate">
+                                <span v-if="pickerFilters.kp.length === 0" class="text-slate-400">知识点</span>
+                                <span v-else class="text-brand-600 font-medium">已选 {{ pickerFilters.kp.length }} 项</span>
+                                
+                                <div class="flex items-center">
+                                    <button v-if="pickerFilters.kp.length > 0" @click.stop="pickerFilters.kp = []" class="p-0.5 mr-1 text-slate-400 hover:text-red-500 rounded-full hover:bg-slate-100 transition-colors" title="清空"><i class="ph-bold ph-x text-xs"></i></button>
+                                    <i class="ph-bold ph-caret-down text-[10px] text-slate-400"></i>
+                                </div>
+                            </div>
+                            <div v-if="dropdownStates.kp" @click.stop class="absolute top-full left-0 w-64 bg-white border border-slate-200 shadow-xl rounded-lg mt-1 p-2 custom-select-dropdown z-[70]">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <input v-model="kpSearchKeyword" placeholder="搜索..." class="flex-1 border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-brand-500">
+                                    <button v-if="kpSearchKeyword" @click="kpSearchKeyword = ''" class="text-slate-400 hover:text-slate-600 text-[10px]">清空</button>
+                                </div>
+                                <div v-if="filteredTreeData.length === 0" class="text-center py-4 text-xs text-slate-400">未找到相关章节</div>
+                                <div v-else class="space-y-1">
+                                    <div v-for="ch in filteredTreeData" :key="ch.id">
+                                        <div class="flex items-center gap-1.5 px-1 py-1 hover:bg-slate-50 rounded">
+                                            <input type="checkbox" :checked="isChapterSelected(ch.id)" @change="toggleChapter(ch.id)" class="rounded text-brand-600 focus:ring-0 w-3 h-3 cursor-pointer">
+                                            <i class="ph-bold ph-folder text-slate-400 text-xs"></i><span class="text-xs font-bold text-slate-700">{{ ch.name }}</span>
+                                        </div>
+                                        <div class="pl-5 space-y-0.5">
+                                            <div v-for="kp in ch.children" :key="kp.id" class="flex items-center gap-1.5 px-1 py-0.5 hover:bg-brand-50 rounded cursor-pointer" @click="toggleFilter('kp', kp.id)">
+                                                <input type="checkbox" :checked="pickerFilters.kp.includes(kp.id)" class="rounded text-brand-600 w-3 h-3 pointer-events-none"><span class="text-xs text-slate-600">{{ kp.name }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 标签 (带一键清空) -->
+                        <div class="flex-1 relative" @click.stop="toggleDropdown('tag')">
+                            <div class="w-full bg-white border border-slate-200 rounded px-2 py-1.5 text-xs text-slate-600 cursor-pointer flex justify-between items-center truncate">
+                                <span v-if="pickerFilters.tag.length === 0" class="text-slate-400">标签</span>
+                                <span v-else class="text-brand-600 font-medium">已选 {{ pickerFilters.tag.length }} 项</span>
+                                <div class="flex items-center">
+                                    <button v-if="pickerFilters.tag.length > 0" @click.stop="pickerFilters.tag = []" class="p-0.5 mr-1 text-slate-400 hover:text-red-500 rounded-full hover:bg-slate-100 transition-colors" title="清空"><i class="ph-bold ph-x text-xs"></i></button>
+                                    <i class="ph-bold ph-caret-down text-[10px] text-slate-400"></i>
+                                </div>
+                            </div>
+                            <div v-if="dropdownStates.tag" @click.stop class="absolute top-full right-0 w-48 bg-white border border-slate-200 shadow-xl rounded-lg mt-1 p-2 custom-select-dropdown z-[70]">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <input v-model="tagSearchKeyword" placeholder="搜索标签..." class="flex-1 border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-brand-500">
+                                    <button v-if="tagSearchKeyword" @click="tagSearchKeyword = ''" class="text-slate-400 hover:text-slate-600 text-[10px]">清空</button>
+                                </div>
+                                <div v-if="filteredTagList.length === 0" class="text-center py-4 text-xs text-slate-400">未找到标签</div>
+                                <div v-else class="space-y-0.5">
+                                    <div v-for="tag in filteredTagList" :key="tag" @click="toggleFilter('tag', tag)" class="flex items-center gap-2 px-2 py-1.5 hover:bg-brand-50 rounded cursor-pointer">
+                                        <input type="checkbox" :checked="pickerFilters.tag.includes(tag)" class="rounded text-brand-600 w-3 h-3 pointer-events-none"><span class="text-xs text-slate-600">{{ tag }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Question List -->
+                <div class="flex-1 overflow-y-auto custom-scroll p-2 bg-slate-50/50">
+                    <div v-for="q in filteredPickerQuestions" :key="q.id" draggable="true" @dragstart="handleDragStart($event, q)"
+                         class="bg-white p-3 rounded-lg border mb-2 cursor-grab active:cursor-grabbing hover:border-brand-400 transition-all group draggable-source relative shadow-sm"
+                         :class="isQuestionInExam(q.id) ? 'border-brand-200 bg-brand-50/20' : 'border-slate-200'">
+                        <div class="flex justify-between items-start gap-2 mb-1">
+                            <div class="flex items-center gap-1.5">
+                                <span :class="getTypeBadgeClass(q.type)" class="px-1.5 py-0.5 rounded text-[10px] font-bold border">{{ getTypeName(q.type) }}</span>
+                                <span class="text-[10px] text-slate-400 bg-slate-100 px-1.5 rounded">{{ getLevelName(q.level) }}</span>
+                            </div>
+                            <button @click="toggleQuestionInActiveSection(q)" class="w-6 h-6 rounded flex items-center justify-center transition-colors" :class="isQuestionInExam(q.id) ? 'bg-red-50 text-red-500 hover:bg-red-100' : 'bg-brand-50 text-brand-600 hover:bg-brand-100'"><i class="ph-bold" :class="isQuestionInExam(q.id) ? 'ph-minus' : 'ph-plus'"></i></button>
+                        </div>
+                        <div class="text-xs text-slate-700 leading-relaxed mb-2 line-clamp-2" v-html="q.content"></div>
+                        <div class="flex items-center justify-between text-[10px] text-slate-400">
+                             <span class="bg-slate-100 px-1 rounded truncate max-w-[80px]">{{ q.kpName }}</span>
+                             <span v-if="q.tags && q.tags.length" class="text-brand-400">{{ q.tags[0] }}</span>
+                        </div>
+                        <div v-if="!isQuestionInExam(q.id)" class="absolute inset-0 bg-transparent" title="拖拽添加"></div>
+                    </div>
+                    <div v-if="filteredPickerQuestions.length === 0" class="flex flex-col items-center justify-center py-10 text-slate-400 gap-2"><i class="ph-duotone ph-magnifying-glass text-2xl"></i><span class="text-xs">未找到相关试题</span></div>
+                </div>
+                <div class="px-4 py-2 border-t border-slate-200 bg-white text-[10px] text-slate-400 flex justify-between">
+                    <span v-if="activeSectionId">添加到: <strong class="text-brand-600">{{ getActiveSectionTitle() }}</strong></span>
+                    <span v-else class="text-amber-500"><i class="ph-fill ph-warning-circle"></i> 请先点击大题选择</span>
+                </div>
+            </div>
+
+            <!-- Stats Bar (Restored Feature) -->
+            <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 border border-slate-700">
+                <div class="flex flex-col items-center leading-none"><span class="text-[10px] text-slate-400">总分</span><span class="font-bold font-mono text-lg" :class="totalStats.score != 100 ? 'text-yellow-400' : 'text-green-400'">{{ totalStats.score }}</span></div>
+                <div class="w-px h-6 bg-slate-600"></div>
+                <div class="flex flex-col items-center leading-none"><span class="text-[10px] text-slate-400">题数</span><span class="font-bold font-mono text-lg">{{ totalStats.count }}</span></div>
+                <div class="w-px h-6 bg-slate-600"></div>
+                <!-- 恢复：分值差额提示 -->
+                <div class="text-xs text-slate-300 min-w-[80px] text-center">
+                    <span v-if="totalStats.score < 100" class="text-yellow-400">还差 {{ 100 - totalStats.score }} 分</span>
+                    <span v-else-if="totalStats.score > 100" class="text-red-400">超出 {{ totalStats.score - 100 }} 分</span>
+                    <span v-else class="text-green-400 flex items-center justify-center gap-1"><i class="ph-fill ph-check-circle"></i> 满分</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal: Preview -->
+    <div v-if="previewModal.show" class="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center">
+        <div class="bg-white rounded-xl w-[800px] h-[85vh] flex flex-col shadow-2xl animate-slide-up">
+            <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center"><h3 class="font-bold text-lg">试卷预览：{{ previewModal.data.title }}</h3><button @click="previewModal.show = false" class="hover:bg-slate-100 p-1 rounded"><i class="ph-bold ph-x text-xl"></i></button></div>
+            <div class="flex-1 overflow-y-auto p-8 bg-white">
+                <div class="text-center mb-8">
+                    <h1 class="text-2xl font-bold text-slate-800 mb-2">{{ previewModal.data.title }}</h1>
+                    <p class="text-sm text-slate-500">总分：{{ previewModal.data.totalScore }}分 | 时长：{{ previewModal.data.duration }}分钟 | 难度：{{ getLevelName(previewModal.data.difficulty) }}</p>
+                    <p v-if="previewModal.data.description" class="text-sm text-slate-500 mt-2 bg-slate-50 px-3 py-1 rounded inline-block border border-slate-100 italic">说明：{{ previewModal.data.description }}</p>
+                </div>
+                <div v-for="sec in previewModal.data.sections" :key="sec.id" class="mb-8">
+                    <h4 class="font-bold text-md text-slate-800 mb-4 bg-slate-50 p-2 rounded">{{ sec.title }} <span class="text-xs font-normal text-slate-500">（共{{sec.questions.length}}题）</span></h4>
+                    <div v-for="(q, idx) in sec.questions" :key="q.id" class="mb-6 pl-2">
+                        <div class="flex gap-2 text-sm text-slate-700"><span class="font-bold">{{ idx + 1 }}.</span><div v-html="q.content"></div><span class="text-xs text-slate-400">({{ sec.scorePerQ }}分)</span></div>
+                        <div v-if="q.options" class="mt-2 pl-6 space-y-1"><div v-for="opt in q.options" :key="opt.label" class="text-xs text-slate-600"><span class="font-bold">{{ opt.label }}.</span> {{ opt.content }}</div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-200 bg-slate-50 flex justify-end"><button @click="previewModal.show = false" class="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm">关闭</button></div>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Question -->
+    <div v-if="editQModal.show" class="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center">
+        <div class="bg-white rounded-xl w-[700px] shadow-2xl p-6 animate-slide-up flex flex-col max-h-[85vh]">
+            <h3 class="font-bold text-lg mb-4 shrink-0">编辑试题（仅当前试卷副本）</h3>
+            <div class="space-y-4 overflow-y-auto custom-scroll flex-1 p-1">
+                <div><label class="text-xs font-bold text-slate-500 block mb-1">题干内容</label><textarea v-model="editQModal.data.content" class="w-full border border-slate-200 rounded p-2 text-sm h-24 focus:border-brand-500 outline-none"></textarea></div>
+                <div v-if="['single', 'multi'].includes(editQModal.data.type)">
+                    <label class="text-xs font-bold text-slate-500 block mb-1">选项设置</label>
+                    <div class="space-y-2">
+                        <div v-for="(opt, idx) in editQModal.data.options" :key="idx" class="flex items-center gap-2">
+                            <input type="checkbox" :checked="editQModal.data.answer.includes(opt.label)" @change="toggleEditModalAnswer(opt.label)" class="w-4 h-4 text-brand-600 rounded"><span class="w-6 h-6 bg-slate-100 rounded flex items-center justify-center text-xs font-bold">{{ opt.label }}</span>
+                            <input v-model="opt.content" type="text" class="flex-1 border border-slate-200 rounded px-2 py-1.5 text-xs outline-none focus:border-brand-500"><button @click="removeEditModalOption(idx)" class="text-slate-400 hover:text-red-500"><i class="ph-bold ph-trash"></i></button>
+                        </div>
+                        <button @click="addEditModalOption" class="text-xs text-brand-600 hover:bg-brand-50 px-2 py-1 rounded">+ 添加选项</button>
+                    </div>
+                </div>
+                <div v-else>
+                    <label class="text-xs font-bold text-slate-500 block mb-1">参考答案</label>
+                    <div v-if="editQModal.data.type === 'judge'" class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" v-model="editQModal.data.answer[0]" value="A"> 正确</label><label class="flex items-center gap-2"><input type="radio" v-model="editQModal.data.answer[0]" value="B"> 错误</label></div>
+                    <textarea v-else v-model="editQModal.data.answerStr" class="w-full border border-slate-200 rounded p-2 text-sm h-16 focus:border-brand-500 outline-none"></textarea>
+                </div>
+                <div><label class="text-xs font-bold text-slate-500 block mb-1">解析</label><textarea v-model="editQModal.data.analysis" class="w-full border border-slate-200 rounded p-2 text-sm h-16 focus:border-brand-500 outline-none"></textarea></div>
+            </div>
+            <div class="mt-4 flex justify-end gap-3 shrink-0 pt-3 border-t border-slate-100">
+                <button @click="editQModal.show = false" class="px-4 py-2 border border-slate-200 rounded text-sm text-slate-600 hover:bg-slate-50">取消</button>
+                <button @click="saveQuestionEdit" class="px-4 py-2 bg-brand-600 text-white rounded text-sm hover:bg-brand-700">保存副本</button>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="toast.show" class="fixed top-10 left-1/2 -translate-x-1/2 z-[110] animate-slide-up"><div class="flex items-center gap-3 px-6 py-3 rounded-full shadow-lg border bg-slate-800 text-white border-slate-700"><i class="ph-fill ph-check-circle text-green-400 text-xl"></i><span class="text-sm font-medium">{{ toast.message }}</span></div></div>
+
+</div>
+
+<script>
+    const { createApp, ref, reactive, computed, watch } = Vue;
+
+    createApp({
+        setup() {
+            const courseType = ref('classic');
+            const chapters = [{ id: 'ch1', name: '第一章 线性表' }, { id: 'ch2', name: '第二章 栈和队列' }, { id: 'ch3', name: '第三章 树与二叉树' }];
+            const allKPs = [{ id: 'kp1', name: '线性表的定义', chapterId: 'ch1' }, { id: 'kp2', name: '链表操作', chapterId: 'ch1' }, { id: 'kp3', name: '栈的存储', chapterId: 'ch2' }, { id: 'kp4', name: '二叉树遍历', chapterId: 'ch3' }];
+
+            const rawQuestions = [
+                { id: 1001, type: 'single', level: 'easy', kpId: 'kp1', content: '在线性表的下列存储结构中，读取指定序号元素的时间复杂度为O(1)的是？', options: [{label:'A', content:'顺序表'}, {label:'B', content:'单链表'}, {label:'C', content:'双向链表'}, {label:'D', content:'循环链表'}], answer: ['A'], analysis: '顺序表支持随机访问', tags: ['基础','常考'] },
+                { id: 1002, type: 'essay', level: 'hard', kpId: 'kp4', content: '请简述二叉树的前序遍历算法思想，并给出递归伪代码。', answer: '思想：根-左-右...', analysis: '略', tags: ['算法','重点'] },
+                { id: 1003, type: 'multi', level: 'medium', kpId: 'kp3', content: '关于栈(Stack)的特性，以下说法正确的有？', options: [{label:'A', content:'先进后出'}, {label:'B', content:'表尾插入删除'}, {label:'C', content:'线性表'}, {label:'D', content:'只能用数组'}], answer: ['A','B','C'], analysis: 'D错误，栈也可用链表实现', tags: ['概念辨析'] },
+                { id: 1004, type: 'fill', level: 'medium', kpId: 'kp2', content: '在单链表中，______节点没有前驱，______节点没有后继。', answer: '头 (Head), 尾 (Tail)', analysis: '基础概念', tags: ['基础'] },
+                { id: 1005, type: 'single', level: 'easy', kpId: 'kp4', content: '深度为 k 的二叉树最多有多少个节点？', options: [{label:'A', content:'2^k - 1'}, {label:'B', content:'2^(k-1)'}, {label:'C', content:'2k'}, {label:'D', content:'2^k'}], answer: ['A'], analysis: '等比数列求和', tags: ['基础公式'] },
+                { id: 1006, type: 'single', level: 'easy', kpId: 'kp3', content: '队列的特性是？', options: [{label:'A', content:'先进先出 (FIFO)'}, {label:'B', content:'先进后出 (LIFO)'}, {label:'C', content:'随机访问'}, {label:'D', content:'栈顶插入'}], answer: ['A'], analysis: 'Queue FIFO', tags: ['概念'] },
+                { id: 1007, type: 'single', level: 'medium', kpId: 'kp2', content: '在单链表指针为p的节点之后插入指针为s的节点，操作是？', options: [{label:'A', content:'s->next=p->next; p->next=s;'}, {label:'B', content:'p->next=s; s->next=p->next;'}, {label:'C', content:'p->next=s->next;'}, {label:'D', content:'s->next=p;'}], answer: ['A'], analysis: '先连后断', tags: ['链表操作'] },
+                { id: 1025, type: 'single', level: 'medium', kpId: 'kp4', content: '在有向无环图(DAG)中，若存在路径 <i, j>，则在拓扑排序序列中节点 i 必须出现在节点 j 之前。这种排序称为？', options: [{label:'A', content:'选择排序'}, {label:'B', content:'拓扑排序'}, {label:'C', content:'快速排序'}], answer: ['B'], analysis: '拓扑排序定义', tags: ['图论', '排序'] },
+                { id: 2001, type: 'judge', level: 'easy', kpId: 'kp1', content: '线性表采用链式存储结构时，要求内存中可用的存储单元地址必须是连续的。', options: [{label:'A', content:'正确'}, {label:'B', content:'错误'}], answer: ['B'], analysis: '链表不需要连续空间', tags: ['存储结构'] },
+                { id: 2002, type: 'judge', level: 'easy', kpId: 'kp3', content: '栈是一种先进先出（FIFO）的线性表。', options: [{label:'A', content:'正确'}, {label:'B', content:'错误'}], answer: ['B'], analysis: '栈是后进先出', tags: ['基础概念'] },
+                { id: 2003, type: 'judge', level: 'medium', kpId: 'kp4', content: '一棵满二叉树一定是一棵完全二叉树。', options: [{label:'A', content:'正确'}, {label:'B', content:'错误'}], answer: ['A'], analysis: '满二叉树是特殊的完全二叉树', tags: ['二叉树性质'] },
+                { id: 2004, type: 'judge', level: 'hard', kpId: 'kp2', content: '在单链表中，如果要访问某个节点的前驱节点，时间复杂度为O(1)。', options: [{label:'A', content:'正确'}, {label:'B', content:'错误'}], answer: ['B'], analysis: '单链表需从头遍历', tags: ['复杂度分析'] },
+                { id: 2005, type: 'judge', level: 'medium', kpId: 'kp3', content: '队列的插入操作只能在表尾进行，删除操作只能在表头进行。', options: [{label:'A', content:'正确'}, {label:'B', content:'错误'}], answer: ['A'], analysis: '队列定义', tags: ['队列操作'] },
+                { id: 2006, type: 'judge', level: 'hard', kpId: 'kp4', content: '哈夫曼树中不存在度为1的结点。', options: [{label:'A', content:'正确'}, {label:'B', content:'错误'}], answer: ['A'], analysis: '哈夫曼树只有度0和度2结点', tags: ['哈夫曼树'] }
+            ].map(q => {
+                 const kp = allKPs.find(k => k.id === q.kpId);
+                 return { ...q, kpName: kp ? kp.name : '', tags: q.tags || [] };
+            });
+
+            const mockExams = [
+                { id: 1, title: '2025年秋季数据结构期中考试', status: 'published', createTime: '2025-10-20', totalScore: 100, questionCount: 25, duration: 90, description: '闭卷考试，禁止携带电子设备', difficulty: 'normal', sections: [] },
+                { id: 2, title: '第一章 线性表 单元测试', status: 'draft', createTime: '2025-11-05', totalScore: 40, questionCount: 10, duration: 45, description: '随堂测试', difficulty: 'easy', sections: [] }
+            ];
+
+            const viewMode = ref('list');
+            const exams = ref(mockExams);
+            const filters = reactive({ search: '', status: '' });
+            const sortKey = ref('time');
+            const toast = ref({ show: false, message: '' });
+            const currentExam = ref({ sections: [] });
+            const activeSectionId = ref(null);
+            const pickerFilters = reactive({ type: '', level: '', kp: [], tag: [], search: '' });
+            const dropdownStates = reactive({ kp: false, tag: false });
+            const kpSearchKeyword = ref('');
+            const tagSearchKeyword = ref('');
+            const previewModal = reactive({ show: false, data: {} });
+            const editQModal = reactive({ show: false, sIdx: -1, qIdx: -1, data: {} });
+
+            const filteredTreeData = computed(() => {
+                if (!kpSearchKeyword.value) return chapters.map(ch => ({ ...ch, children: allKPs.filter(kp => kp.chapterId === ch.id) }));
+                return chapters.map(ch => {
+                    const matchedKPs = allKPs.filter(kp => kp.chapterId === ch.id && kp.name.includes(kpSearchKeyword.value));
+                    return (ch.name.includes(kpSearchKeyword.value) || matchedKPs.length) ? { ...ch, children: matchedKPs.length ? matchedKPs : allKPs.filter(k => k.chapterId === ch.id) } : null;
+                }).filter(Boolean);
+            });
+
+            const filteredTagList = computed(() => {
+                const tags = Array.from(new Set(rawQuestions.flatMap(q => q.tags)));
+                return tagSearchKeyword.value ? tags.filter(t => t.includes(tagSearchKeyword.value)) : tags;
+            });
+
+            const filteredPickerQuestions = computed(() => {
+                return rawQuestions.filter(q => {
+                    const matchType = !pickerFilters.type || q.type === pickerFilters.type;
+                    const matchLevel = !pickerFilters.level || q.level === pickerFilters.level;
+                    const matchSearch = !pickerFilters.search || q.content.includes(pickerFilters.search);
+                    const matchKp = pickerFilters.kp.length === 0 || pickerFilters.kp.includes(q.kpId);
+                    const matchTag = pickerFilters.tag.length === 0 || q.tags.some(t => pickerFilters.tag.includes(t));
+                    return matchType && matchLevel && matchSearch && matchKp && matchTag;
+                });
+            });
+
+            const filteredExams = computed(() => {
+                let res = exams.value.filter(e => e.title.includes(filters.search) && (!filters.status || e.status === filters.status));
+                if (sortKey.value === 'time') res.sort((a,b) => new Date(b.createTime) - new Date(a.createTime));
+                else res.sort((a,b) => b.totalScore - a.totalScore);
+                return res;
+            });
+
+            const totalStats = computed(() => {
+                if (!currentExam.value.sections) return { score: 0, count: 0 };
+                let score = 0, count = 0;
+                currentExam.value.sections.forEach(s => { score += s.questions.length * s.scorePerQ; count += s.questions.length; });
+                return { score, count };
+            });
+
+            const showToast = (msg) => { toast.value = { show: true, message: msg }; setTimeout(() => toast.value.show = false, 2000); };
+            const toggleDropdown = (k) => { dropdownStates[k] = !dropdownStates[k]; };
+            const closeDropdowns = () => { dropdownStates.kp = false; dropdownStates.tag = false; };
+            const toggleFilter = (f, v) => { const i = pickerFilters[f].indexOf(v); i > -1 ? pickerFilters[f].splice(i, 1) : pickerFilters[f].push(v); };
+            const isChapterSelected = (cid) => { const kids = allKPs.filter(k => k.chapterId === cid).map(k => k.id); return kids.length && kids.every(id => pickerFilters.kp.includes(id)); };
+            const toggleChapter = (cid) => {
+                const kids = allKPs.filter(k => k.chapterId === cid).map(k => k.id);
+                if (isChapterSelected(cid)) pickerFilters.kp = pickerFilters.kp.filter(id => !kids.includes(id));
+                else pickerFilters.kp = [...new Set([...pickerFilters.kp, ...kids])];
+            };
+
+            const createNewExam = () => { currentExam.value = { id: Date.now(), title: '新试卷', duration: 60, difficulty: 'normal', description: '', sections: [{ id: 1, title: '一、单选题', scorePerQ: 2, questions: [] }, { id: 2, title: '二、多选题', scorePerQ: 4, questions: [] }] }; activeSectionId.value = 1; viewMode.value = 'editor'; };
+            const editExam = (e) => { currentExam.value = JSON.parse(JSON.stringify(e)); if(!currentExam.value.sections.length) currentExam.value.sections=[{id:1,title:'大题1',scorePerQ:2,questions:[]}]; activeSectionId.value = currentExam.value.sections[0].id; viewMode.value = 'editor'; };
+            const deleteExam = (id) => { if(confirm('确认删除？')) { exams.value = exams.value.filter(e => e.id !== id); showToast('已删除'); } };
+            const saveExam = (status) => {
+                if(!currentExam.value.title) return showToast('请输入标题');
+                if(status==='published' && !totalStats.value.count) return showToast('空卷无法发布');
+                
+                const idx = exams.value.findIndex(e => e.id === currentExam.value.id);
+                const data = { 
+                    ...currentExam.value, 
+                    status, 
+                    createTime: new Date().toISOString().split('T')[0], 
+                    totalScore: totalStats.value.score, 
+                    questionCount: totalStats.value.count 
+                };
+                
+                if(idx > -1) exams.value[idx] = data;
+                else exams.value.unshift(data);
+                
+                viewMode.value = 'list'; showToast(status === 'published' ? '发布成功' : '保存成功');
+            };
+
+            const addSection = () => { const id = Date.now(); currentExam.value.sections.push({ id, title: '新大题', scorePerQ: 2, questions: [] }); activeSectionId.value = id; };
+            const removeSection = (i) => { if(confirm('删除大题？')) { const id = currentExam.value.sections[i].id; currentExam.value.sections.splice(i, 1); if(activeSectionId.value===id) activeSectionId.value = currentExam.value.sections[0]?.id; } };
+            const moveSection = (i, d) => { if(i+d>=0 && i+d<currentExam.value.sections.length) { const t=currentExam.value.sections[i]; currentExam.value.sections[i]=currentExam.value.sections[i+d]; currentExam.value.sections[i+d]=t; } };
+            const getActiveSectionTitle = () => currentExam.value.sections.find(s => s.id === activeSectionId.value)?.title || '';
+            const isQuestionInExam = (id) => currentExam.value.sections.some(s => s.questions.some(q => q.id === id));
+            const toggleQuestionInActiveSection = (q) => {
+                if(!activeSectionId.value) return showToast('请先选择大题');
+                const sec = currentExam.value.sections.find(s => s.id === activeSectionId.value);
+                for(const s of currentExam.value.sections) { const idx = s.questions.findIndex(i => i.id === q.id); if(idx > -1) { s.questions.splice(idx, 1); return; } }
+                sec.questions.push(JSON.parse(JSON.stringify(q)));
+            };
+            const removeQuestion = (si, qi) => currentExam.value.sections[si].questions.splice(qi, 1);
+            const moveQuestion = (si, qi, d) => { const l = currentExam.value.sections[si].questions; if(qi+d>=0 && qi+d<l.length) { const t=l[qi]; l[qi]=l[qi+d]; l[qi+d]=t; } };
+
+            const openEditQuestionModal = (si, qi) => { editQModal.sIdx = si; editQModal.qIdx = qi; const q = currentExam.value.sections[si].questions[qi]; editQModal.data = JSON.parse(JSON.stringify(q)); if(!['single','multi','judge'].includes(q.type)) editQModal.data.answerStr = Array.isArray(q.answer) ? q.answer.join(', ') : q.answer; editQModal.show = true; };
+            const toggleEditModalAnswer = (l) => { const a = editQModal.data.answer; if(editQModal.data.type === 'single') editQModal.data.answer = [l]; else { const i = a.indexOf(l); i>-1 ? a.splice(i,1) : a.push(l); } };
+            const addEditModalOption = () => { const l = 'ABCDEFGH'[editQModal.data.options.length]; editQModal.data.options.push({ label: l, content: '新选项' }); };
+            const removeEditModalOption = (i) => { editQModal.data.options.splice(i, 1); editQModal.data.options.forEach((o,k)=>o.label='ABCDEFGH'[k]); };
+            const saveQuestionEdit = () => { if(!['single','multi','judge'].includes(editQModal.data.type)) editQModal.data.answer = editQModal.data.answerStr; currentExam.value.sections[editQModal.sIdx].questions[editQModal.qIdx] = editQModal.data; editQModal.show = false; showToast('已更新'); };
+            
+            const previewExam = (e) => { previewModal.data = e; previewModal.show = true; };
+            const handleDragStart = (e, q) => { e.dataTransfer.setData('text/plain', JSON.stringify(q)); };
+            const handleDragOver = (e) => e.preventDefault();
+            const handleDrop = (e, si) => { e.preventDefault(); const d = e.dataTransfer.getData('text/plain'); if(!d) return; const q = JSON.parse(d); if(isQuestionInExam(q.id)) return showToast('已存在'); currentExam.value.sections[si].questions.push(JSON.parse(JSON.stringify(q))); activeSectionId.value = currentExam.value.sections[si].id; };
+
+            const getTypeName = (t) => ({single:'单选题', multi:'多选题', fill:'填空题', essay:'简答题', judge:'判断题'}[t]);
+            const getTypeBadgeClass = (t) => ({ single: 'bg-brand-50 text-brand-600 border-brand-200', multi: 'bg-purple-50 text-purple-600 border-purple-200', fill: 'bg-orange-50 text-orange-600 border-orange-200', essay: 'bg-amber-50 text-amber-600 border-amber-200', judge: 'bg-cyan-50 text-cyan-600 border-cyan-200' }[t]);
+            const getLevelName = (l) => ({easy:'简单', normal:'中等', medium:'中等', hard:'困难'}[l] || l);
+
+            return {
+                viewMode, filters, sortKey, exams, filteredExams, toast,
+                currentExam, totalStats, activeSectionId, allKPs, chapters,
+                pickerFilters, filteredPickerQuestions, filteredTreeData, filteredTagList, dropdownStates, kpSearchKeyword, tagSearchKeyword,
+                toggleDropdown, closeDropdowns, toggleFilter, toggleChapter, isChapterSelected, previewModal, editQModal,
+                createNewExam, editExam, deleteExam, saveExam, previewExam, addSection, removeSection, moveSection, getActiveSectionTitle,
+                toggleQuestionInActiveSection, removeQuestion, moveQuestion, isQuestionInExam,
+                openEditQuestionModal, saveQuestionEdit, toggleEditModalAnswer, addEditModalOption, removeEditModalOption,
+                handleDragStart, handleDragOver, handleDrop, getTypeName, getTypeBadgeClass, getLevelName
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
