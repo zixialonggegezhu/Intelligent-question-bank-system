@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能测验 - 沉浸式答题卡片</title>
+    
+    <!-- 依赖库：Vue3, TailwindCSS, RemixIcon, Confetti(撒花特效) -->
+    <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.prod.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.staticfile.net/remixicon/3.5.0/remixicon.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        /* 自定义动画 */
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+
+        .slide-up-enter-active { transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .slide-up-enter-from { opacity: 0; transform: translateY(20px); }
+
+        /* 连对 Combo 动画 */
+        .combo-anim { animation: combo-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes combo-pop {
+            0% { opacity: 0; transform: scale(0.5) rotate(-10deg); }
+            50% { transform: scale(1.2) rotate(5deg); }
+            100% { opacity: 1; transform: scale(1) rotate(0deg); }
+        }
+
+        /* 滚动条美化 */
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 3px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #D1D5DB; }
+
+        /* 选项选中态过渡 */
+        .option-card { transition: all 0.2s ease-in-out; }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen font-sans overflow-hidden">
+
+<div id="app" class="h-full relative">
+
+    <!-- 模拟背景：学习页面 -->
+    <div class="absolute inset-0 z-0 bg-white p-8 filter blur-[2px] opacity-50 pointer-events-none">
+        <h1 class="text-2xl font-bold mb-4">课程学习流</h1>
+        <div class="space-y-4">
+            <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+            <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+            <div class="h-64 bg-gray-200 rounded w-full"></div>
+        </div>
+    </div>
+
+    <!-- 答题卡片遮罩层 (Modal Overlay) -->
+    <div class="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 transition-all">
+        
+        <!-- 核心答题卡片容器 -->
+        <!-- 设计思路：
+             1. max-w-4xl: 宽度足够大，适合阅读长文本。
+             2. h-[90vh]: 高度占据大部分屏幕，形成沉浸感。
+             3. flex-col: 头部固定、底部固定、中间滚动。
+        -->
+        <div class="bg-white w-full max-w-3xl h-[85vh] sm:h-auto sm:max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden relative border border-gray-200">
+            
+            <!-- 1. 卡片头部 (Header) -->
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white shrink-0 z-10">
+                <div class="flex items-center gap-3">
+                    <span class="text-xs font-bold px-2 py-1 rounded bg-blue-50 text-blue-600 border border-blue-100">
+                        {{ typeMap[currentQuestion.type] }}
+                    </span>
+                    <span class="text-gray-400 text-sm">第 {{ currentIndex + 1 }}/{{ questions.length }} 题</span>
+                </div>
+                <!-- 连对计数器 (Combo) -->
+                <div v-if="streak > 1" class="combo-anim flex items-center gap-1 text-orange-500 font-black italic text-lg shadow-orange-100">
+                    <i class="ri-fire-fill"></i> {{ streak }} 连对!
+                </div>
+                <!-- 调试用：切换题型 -->
+                <select v-model="currentIndex" @change="resetState" class="text-xs border rounded p-1 bg-gray-50 text-gray-500 hover:bg-gray-100 cursor-pointer outline-none">
+                    <option v-for="(q, idx) in questions" :key="q.id" :value="idx">{{ idx+1 }}. {{ typeMap[q.type] }}</option>
+                </select>
+            </div>
+
+            <!-- 2. 内容滚动区 (Body) -->
+            <div class="flex-1 overflow-y-auto custom-scroll p-6 sm:p-8 bg-gray-50/30 scroll-smooth" ref="scrollArea">
+                
+                <!-- 题干 (支持长文本) -->
+                <div class="mb-8">
+                    <h2 class="text-lg sm:text-xl font-bold text-gray-800 leading-relaxed select-text">
+                        {{ currentQuestion.stem }}
+                    </h2>
+                    <!-- 如果有代码块或长引用，这里展示效果很好 -->
+                    <div v-if="currentQuestion.code" class="mt-4 bg-gray-900 text-gray-200 p-4 rounded-lg text-sm font-mono overflow-x-auto">
+                        <pre>{{ currentQuestion.code }}</pre>
+                    </div>
+                </div>
+
+                <!-- 交互区域：选项/输入框 -->
+                <div class="space-y-3 mb-8">
+                    
+                    <!-- A. 单选/判断 -->
+                    <template v-if="['single', 'judge'].includes(currentQuestion.type)">
+                        <button v-for="(opt, idx) in currentQuestion.options" :key="idx"
+                            @click="selectOption(idx)"
+                            :disabled="status === 'feedback'"
+                            class="option-card w-full text-left p-4 rounded-xl border-2 flex items-start gap-3 group relative overflow-hidden"
+                            :class="getOptionClass(idx)">
+                            
+                            <!-- 选项标号/图标 -->
+                            <div class="flex-shrink-0 w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold transition-colors mt-0.5"
+                                 :class="getOptionIconClass(idx)">
+                                <span v-if="status !== 'feedback' || (userAnswer !== idx && currentQuestion.correct !== idx)">{{ ['A','B','C','D'][idx] }}</span>
+                                <i v-else-if="currentQuestion.correct === idx" class="ri-check-line text-white"></i>
+                                <i v-else class="ri-close-line text-white"></i>
+                            </div>
+
+                            <!-- 选项内容 -->
+                            <span class="text-sm sm:text-base font-medium transition-colors" :class="status === 'feedback' && currentQuestion.correct === idx ? 'text-green-700' : 'text-gray-700'">
+                                {{ opt }}
+                            </span>
+
+                            <!-- 选中时的微动效背景 -->
+                            <div v-if="userAnswer === idx && status !== 'feedback'" class="absolute inset-0 bg-blue-50 -z-10"></div>
+                        </button>
+                    </template>
+
+                    <!-- B. 多选 -->
+                    <template v-if="currentQuestion.type === 'multiple'">
+                        <button v-for="(opt, idx) in currentQuestion.options" :key="idx"
+                            @click="toggleOption(idx)"
+                            :disabled="status === 'feedback'"
+                            class="option-card w-full text-left p-4 rounded-xl border-2 flex items-start gap-3 relative"
+                            :class="getMultipleOptionClass(idx)">
+                            
+                            <!-- 复选框 -->
+                            <div class="flex-shrink-0 w-6 h-6 rounded border flex items-center justify-center transition-colors mt-0.5"
+                                 :class="getMultipleIconClass(idx)">
+                                <i v-if="userAnswer.includes(idx) || (status === 'feedback' && currentQuestion.correct.includes(idx))" class="ri-check-line text-white"></i>
+                            </div>
+
+                            <span class="text-sm sm:text-base font-medium text-gray-700">{{ opt }}</span>
+                        </button>
+                    </template>
+
+                    <!-- C. 填空 -->
+                    <template v-if="currentQuestion.type === 'blank'">
+                        <div class="relative">
+                            <input type="text" 
+                                v-model="textAnswer"
+                                :disabled="status === 'feedback'"
+                                placeholder="请输入您的答案..."
+                                class="w-full p-4 text-lg border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all disabled:bg-gray-100 disabled:text-gray-500"
+                                :class="{'border-red-500 bg-red-50': status === 'feedback' && !isCorrect, 'border-green-500 bg-green-50': status === 'feedback' && isCorrect}"
+                            >
+                            <div v-if="status === 'feedback'" class="absolute right-4 top-1/2 -translate-y-1/2 text-2xl">
+                                <i v-if="isCorrect" class="ri-checkbox-circle-fill text-green-500"></i>
+                                <i v-else class="ri-close-circle-fill text-red-500"></i>
+                            </div>
+                        </div>
+                    </template>
+
+                </div>
+
+                <!-- 3. 结果反馈区 (提交后显示) -->
+                <transition name="slide-up">
+                    <div v-if="status === 'feedback'" class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-4 ring-1 ring-black/5">
+                        <!-- 结果条 -->
+                        <div class="px-5 py-3 flex items-center gap-2 font-bold text-white" 
+                             :class="isCorrect ? 'bg-green-500' : 'bg-red-500'">
+                            <i :class="isCorrect ? 'ri-emotion-happy-line' : 'ri-emotion-unhappy-line'" class="text-xl"></i>
+                            <span>{{ isCorrect ? '回答正确！' : '回答错误' }}</span>
+                        </div>
+                        
+                        <!-- 解析内容 -->
+                        <div class="p-5 sm:p-6 space-y-4">
+                            <!-- 只有答错才显示正确答案 -->
+                            <div v-if="!isCorrect" class="flex flex-col sm:flex-row sm:items-baseline gap-2 pb-3 border-b border-gray-100">
+                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">正确答案</span>
+                                <span class="text-green-600 font-bold text-lg select-all">{{ getCorrectAnswerDisplay() }}</span>
+                                <span v-if="currentQuestion.type === 'blank'" class="text-xs text-gray-400">(您的答案: {{ textAnswer }})</span>
+                            </div>
+
+                            <!-- 试题解析 (长文本友好) -->
+                            <div>
+                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">试题解析</span>
+                                <div class="text-gray-700 text-sm leading-relaxed text-justify">
+                                    {{ currentQuestion.explanation }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </transition>
+                
+                <!-- 底部占位，防止内容被按钮遮挡 -->
+                <div class="h-16"></div>
+            </div>
+
+            <!-- 4. 底部操作栏 (Footer) -->
+            <div class="absolute bottom-0 left-0 right-0 p-4 sm:px-8 sm:py-5 bg-white border-t border-gray-100 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20 flex justify-end gap-3">
+                <!-- 上一题 (可选，仅作演示布局) -->
+                <button v-if="currentIndex > 0" @click="prevQuestion" class="px-4 py-2 rounded-lg text-gray-500 hover:bg-gray-100 font-medium transition text-sm">
+                    上一题
+                </button>
+
+                <!-- 提交按钮 -->
+                <button v-if="status !== 'feedback'" 
+                    @click="submitAnswer" 
+                    :disabled="!hasAnswered"
+                    class="flex-1 sm:flex-none sm:w-40 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-lg font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2">
+                    <span>提交答案</span>
+                    <i class="ri-arrow-right-circle-line text-lg"></i>
+                </button>
+
+                <!-- 下一题按钮 -->
+                <button v-else 
+                    @click="nextQuestion" 
+                    class="flex-1 sm:flex-none sm:w-40 bg-gray-900 hover:bg-black text-white px-6 py-2.5 rounded-lg font-bold shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
+                    <span>下一题</span>
+                    <i class="ri-skip-forward-line"></i>
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, computed, nextTick } = Vue;
+
+    // 模拟题目数据（包含长文本、代码块等）
+    const MOCK_QUESTIONS = [
+        {
+            id: 1, type: 'single',
+            stem: "在使用 Vue 3 组合式 API (Composition API) 时，若需要定义一个响应式的对象数据，且希望该对象内部属性的变化也能被自动追踪，应该优先使用以下哪个 API？",
+            options: ["ref()", "reactive()", "computed()", "watchEffect()"],
+            correct: 1,
+            explanation: "reactive() 函数用于创建一个响应式对象或数组。与 ref 不同，ref 主要用于基本数据类型（虽然也可以包对象），但 reactive 更符合直觉地处理深层对象属性的响应性。computed 是计算属性，watchEffect 是副作用侦听器，不用于定义数据状态。"
+        },
+        {
+            id: 2, type: 'multiple',
+            stem: "下列关于 HTTP/2 协议特性的描述中，正确的有哪些？（多选）",
+            options: ["二进制分帧 (Binary Framing)", "多路复用 (Multiplexing)", "头部压缩 (Header Compression)", "强制要求 HTTPS"],
+            correct: [0, 1, 2],
+            explanation: "HTTP/2 引入了二进制分帧层、多路复用允许在单一连接上并行传输多个请求/响应，头部压缩（HPACK）减少了开销。虽然浏览器实现中通常要求 HTTP/2 必须基于 TLS（即 HTTPS），但协议标准本身并未强制要求加密（h2c），但在实际 Web 开发场景中，前三者是其核心技术特性。"
+        },
+        {
+            id: 3, type: 'judge',
+            stem: "在 JavaScript 中，'==' 运算符在比较两个不同类型的值时，会先进行类型转换再比较，而 '===' 则不会进行类型转换。",
+            options: ["正确", "错误"],
+            correct: 0,
+            explanation: "正确。'==' 是抽象相等比较，会尝试将操作数转换为相同类型。'===' 是严格相等比较，如果类型不同直接返回 false。"
+        },
+        {
+            id: 4, type: 'blank',
+            stem: "请补全以下 CSS 代码，使元素 .box 在 flex 容器中垂直居中：align-items: ______;",
+            options: [], 
+            correct: "center",
+            explanation: "在 Flexbox 布局中，align-items 属性定义了项目在交叉轴（默认是垂直轴）上的对齐方式。align-items: center; 可以实现垂直居中。"
+        },
+        {
+            id: 5, type: 'single',
+            stem: "阅读以下 Java 代码片段，判断程序的输出结果：",
+            code: "int a = 5;\nint b = a++;\nSystem.out.println(b);",
+            options: ["5", "6", "4", "编译错误"],
+            correct: 0,
+            explanation: "a++ 是后置自增运算符。这意味着表达式的值是自增前的值。所以 b 被赋值为 5，然后 a 变成了 6。因此输出为 5。"
+        }
+    ];
+
+    createApp({
+        setup() {
+            const currentIndex = ref(0);
+            const status = ref('answering'); // answering | selected | feedback
+            const userAnswer = ref(null); // single/judge: index, multiple: array, blank: string
+            const textAnswer = ref('');
+            const isCorrect = ref(false);
+            const streak = ref(0); // 连对计数
+            const scrollArea = ref(null);
+
+            const questions = MOCK_QUESTIONS;
+            
+            const currentQuestion = computed(() => questions[currentIndex.value]);
+
+            const typeMap = {
+                'single': '单项选择题',
+                'multiple': '多项选择题',
+                'judge': '判断题',
+                'blank': '填空题'
+            };
+
+            // 状态重置
+            const resetState = () => {
+                status.value = 'answering';
+                userAnswer.value = currentQuestion.value.type === 'multiple' ? [] : null;
+                textAnswer.value = '';
+                isCorrect.value = false;
+                // 自动滚动回顶部
+                if (scrollArea.value) scrollArea.value.scrollTop = 0;
+            };
+
+            // 初始化第一个问题
+            resetState();
+
+            // 1. 选中选项逻辑
+            const selectOption = (idx) => {
+                if (status.value === 'feedback') return;
+                userAnswer.value = idx;
+                status.value = 'selected';
+            };
+
+            const toggleOption = (idx) => {
+                if (status.value === 'feedback') return;
+                const arr = userAnswer.value;
+                if (arr.includes(idx)) {
+                    userAnswer.value = arr.filter(i => i !== idx);
+                } else {
+                    userAnswer.value = [...arr, idx];
+                }
+                status.value = userAnswer.value.length > 0 ? 'selected' : 'answering';
+            };
+
+            // 2. 提交逻辑
+            const submitAnswer = () => {
+                const q = currentQuestion.value;
+                let correct = false;
+
+                if (q.type === 'single' || q.type === 'judge') {
+                    correct = userAnswer.value === q.correct;
+                } else if (q.type === 'multiple') {
+                    // 简单的数组比较
+                    const userSorted = [...userAnswer.value].sort().toString();
+                    const correctSorted = [...q.correct].sort().toString();
+                    correct = userSorted === correctSorted;
+                } else if (q.type === 'blank') {
+                    correct = textAnswer.value.trim().toLowerCase() === q.correct.toLowerCase();
+                }
+
+                isCorrect.value = correct;
+                status.value = 'feedback';
+
+                if (correct) {
+                    streak.value++;
+                    triggerConfetti();
+                } else {
+                    streak.value = 0;
+                }
+
+                // 提交后自动滚动到底部看解析
+                nextTick(() => {
+                    if (scrollArea.value) {
+                        scrollArea.value.scrollTo({ top: scrollArea.value.scrollHeight, behavior: 'smooth' });
+                    }
+                });
+            };
+
+            const nextQuestion = () => {
+                if (currentIndex.value < questions.length - 1) {
+                    currentIndex.value++;
+                    resetState();
+                } else {
+                    alert('已经是最后一题啦！');
+                }
+            };
+            
+            const prevQuestion = () => {
+                if (currentIndex.value > 0) {
+                    currentIndex.value--;
+                    resetState();
+                    // 这里简化处理，回退时重置状态，实际业务可能需要保留已答状态
+                }
+            };
+
+            // 辅助：判断是否有答案（控制提交按钮禁用）
+            const hasAnswered = computed(() => {
+                const q = currentQuestion.value;
+                if (q.type === 'multiple') return userAnswer.value.length > 0;
+                if (q.type === 'blank') return textAnswer.value.trim().length > 0;
+                return userAnswer.value !== null;
+            });
+
+            // 样式辅助函数
+            const getOptionClass = (idx) => {
+                const base = "cursor-pointer ";
+                // 反馈阶段
+                if (status.value === 'feedback') {
+                    const q = currentQuestion.value;
+                    // 正确选项：始终绿色边框
+                    if (q.correct === idx) return "bg-green-50 border-green-500 shadow-[0_0_0_1px_rgba(34,197,94,1)]";
+                    // 用户选错的项：红色边框
+                    if (userAnswer.value === idx && !isCorrect.value) return "bg-red-50 border-red-500 opacity-60";
+                    // 其他无关选项：变淡
+                    return "border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed";
+                }
+                // 选中阶段
+                if (userAnswer.value === idx) return base + "border-blue-500 bg-blue-50 shadow-[0_0_0_1px_rgba(59,130,246,1)]";
+                // 默认
+                return base + "border-gray-200 hover:border-blue-300 hover:bg-gray-50";
+            };
+
+            const getOptionIconClass = (idx) => {
+                if (status.value === 'feedback') {
+                    if (currentQuestion.value.correct === idx) return "bg-green-500 border-green-500 text-white";
+                    if (userAnswer.value === idx && !isCorrect.value) return "bg-red-500 border-red-500 text-white";
+                    return "border-gray-300 text-gray-400";
+                }
+                if (userAnswer.value === idx) return "bg-blue-600 border-blue-600 text-white";
+                return "border-gray-300 text-gray-500 group-hover:border-blue-400 group-hover:text-blue-500";
+            };
+
+            const getMultipleOptionClass = (idx) => {
+                // 逻辑类似单选，只是判断 userAnswer 数组
+                if (status.value === 'feedback') {
+                    const q = currentQuestion.value;
+                    if (q.correct.includes(idx)) return "bg-green-50 border-green-500 shadow-[0_0_0_1px_rgba(34,197,94,1)]";
+                    if (userAnswer.value.includes(idx) && !q.correct.includes(idx)) return "bg-red-50 border-red-500 opacity-60";
+                    return "border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed";
+                }
+                if (userAnswer.value.includes(idx)) return "cursor-pointer border-blue-500 bg-blue-50 shadow-[0_0_0_1px_rgba(59,130,246,1)]";
+                return "cursor-pointer border-gray-200 hover:border-blue-300 hover:bg-gray-50";
+            };
+
+            const getMultipleIconClass = (idx) => {
+                if (status.value === 'feedback') {
+                     if (currentQuestion.value.correct.includes(idx)) return "bg-green-500 border-green-500";
+                     if (userAnswer.value.includes(idx)) return "bg-red-500 border-red-500"; // 选错的
+                     return "border-gray-300";
+                }
+                if (userAnswer.value.includes(idx)) return "bg-blue-600 border-blue-600";
+                return "border-gray-300 bg-white group-hover:border-blue-400";
+            };
+
+            const getCorrectAnswerDisplay = () => {
+                const q = currentQuestion.value;
+                if (q.type === 'single' || q.type === 'judge') return q.options[q.correct];
+                if (q.type === 'multiple') return q.correct.map(i => ['A','B','C','D'][i]).join('、');
+                if (q.type === 'blank') return q.correct;
+                return '';
+            };
+
+            // 撒花特效
+            const triggerConfetti = () => {
+                const count = 200;
+                const defaults = { origin: { y: 0.7 } };
+
+                function fire(particleRatio, opts) {
+                    confetti(Object.assign({}, defaults, opts, {
+                        particleCount: Math.floor(count * particleRatio)
+                    }));
+                }
+
+                fire(0.25, { spread: 26, startVelocity: 55 });
+                fire(0.2, { spread: 60 });
+                fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+                fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+                fire(0.1, { spread: 120, startVelocity: 45 });
+            };
+
+            return {
+                currentIndex, currentQuestion, questions, typeMap,
+                status, userAnswer, textAnswer, isCorrect, streak, hasAnswered,
+                scrollArea,
+                selectOption, toggleOption, submitAnswer, nextQuestion, prevQuestion, resetState,
+                getOptionClass, getOptionIconClass, getMultipleOptionClass, getMultipleIconClass, getCorrectAnswerDisplay
+            };
+        }
+    }).mount('#app');
+</script>
+
+</body>
+</html>
