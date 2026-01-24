@@ -128,6 +128,14 @@
                         </div>
                     </div>
                     <div class="h-5 w-px bg-slate-200"></div>
+                    
+                    <!-- 【新增】学生测验入口图标 -->
+                    <button @click="openStudentTest" class="relative p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-full transition-colors group" title="学生视角测一测">
+                        <i class="ph ph-pencil-simple-line text-xl"></i>
+                         <!-- Tooltip -->
+                         <span class="absolute right-0 top-full mt-1 bg-slate-800 text-white text-[10px] px-2 py-1 rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 whitespace-nowrap">测一测</span>
+                    </button>
+
                     <button class="relative p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-full transition-colors">
                         <i class="ph ph-bell text-xl"></i>
                     </button>
@@ -872,6 +880,14 @@
                     }, 500);
                 };
 
+                // 【新增】学生测验入口跳转逻辑
+                const openStudentTest = () => {
+                    showToast('正在进入学生测验视图...');
+                    setTimeout(() => {
+                        window.open('studentt.html', '_blank');
+                    }, 500);
+                };
+
                 const handleClickOutside = (e) => {
                     if (kpDropdownRef.value && !kpDropdownRef.value.contains(e.target)) {
                         isKpDropdownOpen.value = false;
@@ -907,7 +923,7 @@
                     toggleKp, getCount, openDetail, toggleSelect, toggleSelectAll, confirmDeleteSingle, openDeleteModal, executeDelete, 
                     handleBulkExport, generateQuiz, showToast, triggerAiWorkbench, applyKpFilter,
                     getTypeName, getTypeBadgeClass, getLevelName, getLevelDotColor, getLevelTextColor, getOrderLimitLabel,
-                    goToPaperBank // 【新增】导出跳转函数
+                    goToPaperBank, openStudentTest // 【新增】导出跳转函数
                 };
             }
         }).mount('#app');
